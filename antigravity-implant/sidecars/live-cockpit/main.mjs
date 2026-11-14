@@ -8,6 +8,8 @@ import { readFileSync, writeFileSync, readdirSync, existsSync, statSync, openSyn
 import { homedir } from 'node:os';
 import { join, dirname, extname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { randomBytes, createHash } from 'node:crypto';
+import http from 'node:http';
 
 const here = dirname(fileURLToPath(import.meta.url));
 // SDK 는 Google 이 앱과 함께 깔아 주는 것을 쓴다 (이 저장소에 넣지 않음). 플러그인 안 sdk/ 사본이 있으면 그것 먼저.
@@ -36,6 +38,24 @@ const LIVE_RULES_TEMPLATE = `<!--
 예) 지금부터 CSS는 건드리지 마.
 -->
 `;
+
+// ---------- 요청 보호 ----------
+// 1) 토큰: 앱이 ANTIGRAVITY_SIDECAR_UI_TOKEN 을 주면 SDK 가 모든 POST 에서 검사한다. 안 주면(직접 실행 등) 무방비가 되므로
+//    여기서 무작위 토큰을 만들어 건다 — 다른 웹페이지가 몰래 POST(규칙 쓰기·되돌리기·메시지 보내기)를 보내지 못하게.
+//    패널 페이지에는 그 토큰을 넣어 주고, preload 가 읽도록 주소에 ?token= 을 붙인다.
+if (!process.env.ANTIGRAVITY_SIDECAR_UI_TOKEN) process.env.ANTIGRAVITY_SIDECAR_UI_TOKEN = randomBytes(24).toString('hex');
+const UI_TOKEN = process.env.ANTIGRAVITY_SIDECAR_UI_TOKEN;
+// 2) 호스트 이름: 127.0.0.1 / localhost 로 온 요청만 받는다 (DNS rebinding 으로 다른 사이트가 페이지·토큰을 읽는 것 방지)
+const ORIG_EMIT = http.Server.prototype.emit;
+http.Server.prototype.emit = function (ev, req, res) {
+  if (ev === 'request' && req && res) {
+    const host = String(req.headers.host || '').toLowerCase();
+    if (!/^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/.test(host)) {
+      res.writeHead(403, { 'Content-Type': 'text/plain' }); res.end('forbidden host'); return true;
+    }
+  }
+  return ORIG_EMIT.apply(this, arguments);
+};
 
 const app = new SidecarApp();
 
@@ -237,7 +257,9 @@ function runNode(script, args, timeout = 90000) {
 }
 
 // ---------- 페이지 ----------
-app.page('/', () => readFileSync(join(here, 'ui.html'), 'utf8'));
+// 페이지에 토큰을 넣는다. preload.js 보다 먼저 주소에 ?token= 을 붙여, SDK 의 secureFetch·sendMessage 도 토큰을 보내게 한다.
+app.page('/', () => readFileSync(join(here, 'ui.html'), 'utf8').replace('<script src="/preload.js"></script>',
+  `<script>(function(){var t=${JSON.stringify(UI_TOKEN)};window.__IMPLANT_TOKEN=t;var p=new URLSearchParams(location.search);if(!p.get('token')){p.set('token',t);history.replaceState(null,'',location.pathname+'?'+p.toString()+location.hash);}})();</script>\n<script src="/preload.js"></script>`));
 
 // ---------- API ----------
 app.api('/api/conversations', () => ({ items: recentConversations() }), 'GET');
@@ -327,7 +349,11 @@ app.api('/api/live-rules', (body) => {
   // 훅은 주석을 뺀 앞 2000자만 넣는다(liveRulesMaxChars). 그보다 길면 잘리지 않게 저장 전에 알린다.
   if (text.replace(/<!--[\s\S]*?-->/g, '').trim().length > 2000) return jsonError('실시간 규칙은 주석을 빼고 2000자까지만 적용됩니다. 줄여 주세요.', 413);
   if (text.length > 20000) return jsonError('too long', 413);
-  try { atomicWrite(LIVE_RULES, text); } catch (e) { return jsonError('저장 실패: ' + e.code, 500); }
+  try {
+    atomicWrite(LIVE_RULES, text);
+    // 패널에서 저장한 내용이라는 지문 — 훅은 명령이 돈 뒤 바뀐 규칙도 이 지문이 맞으면 받아들인다
+    atomicWrite(join(DATA_DIR, 'live_rules.sha256'), createHash('sha256').update(text).digest('hex'));
+  } catch (e) { return jsonError('저장 실패: ' + e.code, 500); }
   return { ok: true, mtime: fileStamp(LIVE_RULES) };
 }, 'POST');
 

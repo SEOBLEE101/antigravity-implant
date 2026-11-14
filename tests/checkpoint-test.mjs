@@ -62,6 +62,17 @@ const snap = snapshot(big, null);
 check('새 파일 5000개 초과: 새 파일은 빼고 빠르게 찍음', snap && snap.skipped.some((s) => /너무 많아/.test(s)) && Date.now() - t0 < 30000, JSON.stringify(snap && snap.skipped.slice(0, 2)) + ` ${Date.now() - t0}ms`);
 rmSync(big, { recursive: true, force: true });
 
+// 저장소 자체 설정에 filter 프로그램이 있으면 찍지 않는다 (git add 가 그 프로그램을 실행할 수 있음)
+const evil = mkdtempSync(join(tmpdir(), 'agyc-evil-'));
+execFileSync('git', ['-C', evil, 'init', '-q']);
+writeFileSync(join(evil, 'a.txt'), 'x'); execFileSync('git', ['-C', evil, 'add', '-A']); execFileSync('git', ['-C', evil, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'i']);
+execFileSync('git', ['-C', evil, 'config', '--local', 'filter.pwn.clean', 'node -e "require(\'fs\').writeFileSync(\'PWNED\',\'1\')"']);
+writeFileSync(join(evil, '.gitattributes'), '*.txt filter=pwn\n'); writeFileSync(join(evil, 'a.txt'), 'changed');
+let refused = false;
+try { snapshot(evil, null); } catch (e) { refused = e.code === 'UNSAFE_REPO_CONFIG'; }
+check('저장소 설정에 filter 가 있으면 찍지 않고, 그 프로그램도 실행되지 않음', refused && !existsSync(join(evil, 'PWNED')), `refused=${refused} pwned=${existsSync(join(evil, 'PWNED'))}`);
+rmSync(evil, { recursive: true, force: true });
+
 rmSync(repo, { recursive: true, force: true }); rmSync(plain, { recursive: true, force: true });
 console.log(fails ? `\n${fails}개 실패` : '\n전부 통과');
 process.exitCode = fails ? 1 : 0;

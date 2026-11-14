@@ -165,6 +165,7 @@
     const f = sc ? sc.fetch : (u, o) => fetch(u, o);
     const o = Object.assign({ method: 'GET' }, opts || {});
     if (o.body) o.headers = Object.assign({ 'Content-Type': 'application/json' }, o.headers || {});
+    if (!sc && window.__IMPLANT_TOKEN && o.method !== 'GET') o.headers = Object.assign({ 'X-Sidecar-Token': window.__IMPLANT_TOKEN }, o.headers || {});
     return f(path, o).then(async (r) => {
       let j = null;
       try { j = await r.json(); } catch {}

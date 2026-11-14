@@ -20,13 +20,13 @@ const H = home.replace(/\//g, '\\');
 
 const r1 = post('read_file', 'E:\\Music\\Samples\\kick.wav');
 check('출력은 항상 {} (아무것도 막지 않음)', r1.stdout.trim() === '{}' && r1.status === 0, r1.stdout + r1.stderr);
-check('허락된 바깥 파일 → 그 폴더 읽기 규칙 추가 (원래 대소문자)', allow().includes('read_file(E:\\Music\\Samples)'), JSON.stringify(allow()));
+check('허락된 바깥 파일 → 그 폴더 읽기 규칙 추가 (원래 대소문자)', allow().includes('read_file(E:\\Music\\Samples\\)'), JSON.stringify(allow()));
 post('read_file', 'E:\\Music\\Samples\\drums\\hat.wav');
 check('이미 덮인 하위 폴더는 또 넣지 않음', allow().filter((a) => a.startsWith('read_file(E:\\Music')).length === 1, JSON.stringify(allow()));
 post('read_file', 'F:\\Wide\\deep\\a.txt');
 check('기존 넓은 규칙이 덮으면 넣지 않음', !allow().some((a) => a.startsWith('read_file(F:\\Wide\\deep')), JSON.stringify(allow()));
 post('write_file', 'E:\\Music\\Samples\\new.txt');
-check('쓰기는 따로 (write_file 규칙)', allow().includes('write_file(E:\\Music\\Samples)'), JSON.stringify(allow()));
+check('쓰기는 따로 (write_file 규칙)', allow().includes('write_file(E:\\Music\\Samples\\)'), JSON.stringify(allow()));
 post('read_file', 'E:\\Denied\\a.txt', 'permission denied');
 check('거부(오류)된 건 넣지 않음', !allow().some((a) => a.includes('Denied')), JSON.stringify(allow()));
 post('read_file', 'C:\\work\\proj\\src\\a.js');
@@ -44,7 +44,7 @@ const tdir = join(home, 'conv', '.system_generated', 'logs'); mkdirSync(tdir, { 
 const tf = join(tdir, 'transcript_full.jsonl');
 writeFileSync(tf, JSON.stringify({ step_index: 0, type: 'USER_INPUT', source: 'USER_EXPLICIT', content: '<USER_REQUEST>hi</USER_REQUEST>' }) + '\n');
 spawnSync(process.execPath, [join(hooks, 'pre_invocation.mjs')], { input: JSON.stringify({ conversationId: randomUUID(), transcriptPath: tf, modelName: 'gemini', invocationNum: 0 }), encoding: 'utf8', env });
-check('빠진 규칙을 요청 시작 때 다시 채움', allow().includes('read_file(E:\\Music\\Samples)') && allow().includes('write_file(E:\\Music\\Samples)'), JSON.stringify(allow()));
+check('빠진 규칙을 요청 시작 때 다시 채움', allow().includes('read_file(E:\\Music\\Samples\\)') && allow().includes('write_file(E:\\Music\\Samples\\)'), JSON.stringify(allow()));
 check('기억 목록 파일', JSON.parse(readFileSync(join(home, '.gemini', 'antigravity-implant', 'folder-grants.json'), 'utf8')).read.length === 1, '');
 
 rmSync(home, { recursive: true, force: true });

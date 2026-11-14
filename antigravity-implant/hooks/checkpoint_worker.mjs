@@ -49,10 +49,11 @@ try {
     let r;
     try { r = snapshot(repo, ref); } catch (e) {
       const why = String(e && (e.code || e.message) || e);
-      if (/ETIMEDOUT|ENOBUFS|maxBuffer/i.test(why)) {
+      const unsafe = e && e.code === 'UNSAFE_REPO_CONFIG';
+      if (unsafe || /ETIMEDOUT|ENOBUFS|maxBuffer/i.test(why)) {
         slow[key] = Date.now();
         try { atomicWrite(slowFile, JSON.stringify(slow)); } catch {}
-        logError('checkpoint_worker', new Error(`${repo}: 시간 초과(${why}) — 이 저장소는 하루 동안 체크포인트를 건너뜀`));
+        logError('checkpoint_worker', new Error(`${repo}: ${unsafe ? '저장소 설정(.git/config)에 filter/include 같은 실행 설정이 있어' : `시간 초과(${why})`} — 이 저장소는 하루 동안 체크포인트를 건너뜀`));
       } else {
         logError('checkpoint_worker', new Error(`${repo}: ${why.slice(0, 300)}`));
       }

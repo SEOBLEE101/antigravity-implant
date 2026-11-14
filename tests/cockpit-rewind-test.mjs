@@ -5,6 +5,7 @@ import { tmpdir, homedir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
+import http from 'node:http';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', 'antigravity-implant');
 const repo = mkdtempSync(join(tmpdir(), 'agyc-ck-'));
@@ -22,8 +23,10 @@ g('init', '-q'); writeFileSync(join(repo, 'a.txt'), 'original\n'); g('add', '-A'
 spawnSync(process.execPath, [join(root, 'hooks', 'checkpoint_worker.mjs'), conv, '0', Buffer.from(JSON.stringify({ dirs: [repo], userText: '시험 요청' })).toString('base64')]);
 writeFileSync(join(repo, 'a.txt'), 'broken\n');
 
+const TOKEN = 'test-token-' + randomUUID();
+const H = { 'Content-Type': 'application/json', 'X-Sidecar-Token': TOKEN };
 const port = 40000 + Math.floor(Math.random() * 20000); // 고정 포트를 쓰지 않는다 (겹침 방지)
-const srv = spawn(process.execPath, ['main.mjs'], { cwd: join(root, 'sidecars', 'live-cockpit'), env: { ...process.env, ANTIGRAVITY_LS_ADDRESS: '127.0.0.1:1', ANTIGRAVITY_CSRF_TOKEN: 'x', ANTIGRAVITY_SIDECAR_WEB_PORT: String(port) }, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+const srv = spawn(process.execPath, ['main.mjs'], { cwd: join(root, 'sidecars', 'live-cockpit'), env: { ...process.env, ANTIGRAVITY_SIDECAR_UI_TOKEN: TOKEN, ANTIGRAVITY_LS_ADDRESS: '127.0.0.1:1', ANTIGRAVITY_CSRF_TOKEN: 'x', ANTIGRAVITY_SIDECAR_WEB_PORT: String(port) }, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
 let srvErr = '';
 srv.stderr.on('data', (d) => { srvErr += d; });
 const base = `http://127.0.0.1:${port}`;
@@ -40,7 +43,7 @@ try {
   const id = list.items[0].id;
   const diff = await (await fetch(`${base}/api/checkpoint-diff?conversationId=${conv}&id=${encodeURIComponent(id)}`)).json();
   check('변경 API: a.txt 가 바뀐 것으로 보임', /a\.txt/.test(diff.names || ''), JSON.stringify(diff));
-  const rw = await (await fetch(`${base}/api/rewind`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ conversationId: conv, id }) })).json();
+  const rw = await (await fetch(`${base}/api/rewind`, { method: 'POST', headers: H, body: JSON.stringify({ conversationId: conv, id }) })).json();
   check('되돌리기 API: 성공하고 a.txt 복원', rw.ok && readFileSync(join(repo, 'a.txt'), 'utf8') === 'original\n', JSON.stringify(rw) + ' / ' + readFileSync(join(repo, 'a.txt'), 'utf8'));
   const list2 = await (await fetch(`${base}/api/checkpoints?conversationId=${conv}`)).json();
   check('되돌리기 직전 상태가 목록에 추가', list2.items.length === 2 && list2.items[1].kind === 'undo' && !!list2.items[1].ref, JSON.stringify(list2));
@@ -54,10 +57,16 @@ try {
   writeFileSync(stateFile, JSON.stringify({ workspacePaths: ['\\\\evil-server\\share', repo] }));
   const d1 = await (await fetch(`${base}/api/diff?conversationId=${conv}`)).json();
   check('변경 API: 기록된 폴더만 보이고 UNC 는 빠짐', d1.repos.length === 1 && d1.repos[0].git === true, JSON.stringify(d1).slice(0, 300));
-  const pr = await (await fetch(`${base}/api/preset`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'nope' }) })).json();
+  const pr = await (await fetch(`${base}/api/preset`, { method: 'POST', headers: H, body: JSON.stringify({ name: 'nope' }) })).json();
   check('모드 API: 모르는 이름은 거부', !!pr.error, JSON.stringify(pr));
-  const emptyId = await fetch(`${base}/api/rewind`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ conversationId: conv, id: '' }) });
-  const dashId = await fetch(`${base}/api/rewind`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ conversationId: conv, id: '--json' }) });
+  const emptyId = await fetch(`${base}/api/rewind`, { method: 'POST', headers: H, body: JSON.stringify({ conversationId: conv, id: '' }) });
+  const dashId = await fetch(`${base}/api/rewind`, { method: 'POST', headers: H, body: JSON.stringify({ conversationId: conv, id: '--json' }) });
+  const noTok = await fetch(`${base}/api/live-rules`, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ text: 'x' }) });
+  check('토큰 없는 POST 는 거부 (다른 웹페이지의 몰래 요청 차단)', noTok.status === 401, String(noTok.status));
+  const badHost = await new Promise((res) => { const rq = http.request({ host: '127.0.0.1', port, path: '/', headers: { Host: 'evil.example:' + port } }, (r) => { r.resume(); res(r.statusCode); }); rq.on('error', () => res(0)); rq.end(); });
+  check('다른 호스트 이름으로 온 요청은 거부 (DNS rebinding 차단)', badHost === 403, String(badHost));
+  const page = await (await fetch(`${base}/`)).text();
+  check('패널 페이지에 토큰이 들어가 preload 보다 먼저 주소에 붙음', page.indexOf('__IMPLANT_TOKEN') >= 0 && page.indexOf('__IMPLANT_TOKEN') < page.indexOf('/preload.js'), '');
   check('되돌리기 API: 빈 번호·옵션 같은 번호는 거부 (마지막 것으로 덮어쓰지 않음)', emptyId.status === 400 && dashId.status === 400, `${emptyId.status} ${dashId.status}`);
 } finally {
   srv.kill();

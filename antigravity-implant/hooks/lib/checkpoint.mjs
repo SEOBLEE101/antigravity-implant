@@ -29,6 +29,15 @@ function git(cwd, args, opts = {}) {
 }
 const lines0 = (s) => String(s || '').split('\0').filter(Boolean);
 
+export function hasLocalExecConfig(repo) {
+  try {
+    const out = git(repo, ['config', '--local', '--name-only', '--get-regexp', '^(filter\\.|include\\.|includeif\\.|core\\.(fsmonitor|hookspath|sshcommand|gitproxy)|diff\\..*\\.(textconv|command)|merge\\..*\\.driver)'], { timeout: 5000 });
+    return out.trim().length > 0;
+  } catch (e) {
+    return e.status !== 1; // 1 = 해당 설정 없음(정상). 그 밖의 오류면 안전하게 "있다"로 본다
+  }
+}
+
 export function repoRoot(dir) {
   try { return git(dir, ['rev-parse', '--show-toplevel'], { timeout: 5000 }).trim(); } catch { return null; }
 }
@@ -45,6 +54,9 @@ export function snapshot(dir, refName) {
   // 사용자 폴더 전체나 드라이브 전체가 저장소면 너무 커서 찍지 않는다
   const norm = repo.replace(/\//g, '\\').replace(/[\\]+$/, '').toLowerCase();
   if (norm === HOME_ROOT.replace(/\//g, '\\') || /^[a-z]:$/.test(norm) || norm === '') return null;
+  // 저장소 자체 설정(.git/config)에 filter 프로그램(clean/smudge/process)이나 다른 설정 파일 포함(include)이 있으면
+  // git add / checkout-index 가 그 프로그램을 실행할 수 있다 → 그런 저장소는 찍지 않는다 (사용자 전역 설정의 git-lfs 등은 괜찮음)
+  if (hasLocalExecConfig(repo)) throw Object.assign(new Error('저장소 설정에 filter/include 가 있어 체크포인트를 건너뜀'), { code: 'UNSAFE_REPO_CONFIG' });
   const idx = tmpIndex();
   const env = { GIT_INDEX_FILE: idx };
   try {

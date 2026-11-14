@@ -47,7 +47,8 @@ export function folderFor(path) {
 function load(f, d) { try { return JSON.parse(readFileSync(f, 'utf8').replace(/^\uFEFF/, '')); } catch { return d; } }
 function save(f, v) { atomicWrite(f, JSON.stringify(v, null, 1)); }
 
-const ruleOf = (kind, folder) => `${kind === 'read' ? 'read_file' : 'write_file'}(${folder})`;
+// 규칙 끝에 \ 를 붙인다: 앞부분 일치라 "D:\proj" 는 "D:\project-x" 도 허락해 버리기 때문 (끝에 \ 를 붙이면 폴더 안만 — agy CLI 로 확인)
+const ruleOf = (kind, folder) => `${kind === 'read' ? 'read_file' : 'write_file'}(${String(folder).replace(/\\+$/, '')}\\)`;
 
 // 전역 권한 목록에 규칙을 넣는다. 이미 더 넓은 규칙이 덮고 있으면 넣지 않는다. 넣은 개수를 돌려준다.
 export function addToConfig(rules) {
