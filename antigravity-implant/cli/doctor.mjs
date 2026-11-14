@@ -76,7 +76,7 @@ try {
 
 // 5) 패널(Live Cockpit)
 const sc = appCfg && appCfg.sidecars && Object.keys(appCfg.sidecars).find((k) => k.startsWith(PLUGIN_NAME + '/'));
-sc ? ok('패널', `Live Cockpit 등록됨 (${sc})`) : warn('패널', 'Live Cockpit 이 앱에 등록되지 않았습니다', '앱 오른쪽 위 패널 메뉴에서 Live Cockpit 켜기');
+sc ? ok('패널', `Live Cockpit 등록됨 (${sc})`) : warn('패널', 'Live Cockpit 이 앱에 등록되지 않았습니다', 'Customizations → antigravity-implant → UI extensions → Live Cockpit 에서 켜기');
 const sdk = [join(PLUGIN_ROOT, 'sidecars', 'live-cockpit', 'sdk', 'index.mjs'), join(HOME, '.gemini', 'config', 'node_modules', 'sidecar_sdk', 'index.mjs'), join(HOME, '.gemini', 'antigravity', 'lib', 'node_modules', 'sidecar_sdk', 'index.mjs')].find((p) => existsSync(p));
 sdk ? ok('패널', `사이드카 SDK: ${sdk.replace(HOME, '~')}`) : bad('패널', 'Antigravity 의 sidecar_sdk 를 찾지 못했습니다', 'Antigravity 앱을 한 번 실행해 패널 기능을 내려받게 하기');
 

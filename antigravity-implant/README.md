@@ -77,7 +77,7 @@ antigravity-implant/
 powershell -ExecutionPolicy Bypass -File .\install.ps1 -StatusLine
 ```
 
-그다음 앱을 다시 시작하고, 앱 오른쪽 위 패널 메뉴(또는 Skills & Customizations → Antigravity Implant)에서 **Live Cockpit** 사이드카를 켭니다. 새 대화에서 "이 폴더 파일 3개를 읽고 요약해줘" 라고 보내 보세요. 도구마다 진행률 한 줄이 먼저 나오면 동작하는 것입니다. 점검은 `/doctor`.
+그다음 앱을 다시 시작하고, 대화 화면 오른쪽 패널의 **`+` → Extensions → Live Cockpit** 으로 엽니다(대화마다 한 번). 처음 한 번은 왼쪽 **Customizations → antigravity-implant → UI extensions → Live Cockpit** 에서 Running 인지 확인하세요. 새 대화에서 "이 폴더 파일 3개를 읽고 요약해줘" 라고 보내 보세요. 도구마다 진행률 한 줄이 먼저 나오면 동작하는 것입니다. 점검은 `/doctor`.
 
 - 잠깐 끄기(재시작 없이): `~/.gemini/antigravity-implant/off` 빈 파일을 만들기. 지우면 다시 켜짐
 - 끄기/켜기: `agy plugin disable antigravity-implant` / `agy plugin enable antigravity-implant`

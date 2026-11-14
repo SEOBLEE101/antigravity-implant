@@ -80,5 +80,5 @@ if ($StatusLine) { Invoke-Native node @($jsonEdit, 'set-statusline', $cli, (Join
 Write-Host ''
 Write-Host '다음:'
 Write-Host '  1) Antigravity 앱을 다시 시작하세요 (훅·스킬은 새 대화부터 적용).'
-Write-Host '  2) 패널: 오른쪽 위 패널 메뉴에서 "Live Cockpit" 을 켜세요.'
+Write-Host '  2) 패널: 대화 화면 오른쪽 패널의 + -> Extensions -> Live Cockpit (대화마다 한 번)'
 Write-Host "  3) 점검: 새 대화에서 /doctor  (또는 node `"$dest\cli\doctor.mjs`")"
