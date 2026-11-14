@@ -1,0 +1,14 @@
+{
+  "command": "node.exe",
+  "args": ["main.mjs"],
+  "restart_policy": "always",
+  "display_name": "Live Cockpit",
+  "description": "대화 옆 패널: 에이전트가 지금 무엇을 하는지(도구·생각 요약·경과 시간), 중간 스크린샷, 훅 알림 기록, 실시간 규칙 편집, 조향 메시지 보내기.",
+  "has_web_ui": true,
+  "ui_config": {
+    "display_name": "Live Cockpit",
+    "views": [
+      { "title": "Live Cockpit", "path": "/", "entrypoint": "SIDECAR_UI_ENTRYPOINT_AUX_PANE" }
+    ]
+  }
+}

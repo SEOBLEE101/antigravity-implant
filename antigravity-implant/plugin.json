@@ -1,0 +1,13 @@
+{
+  "name": "antigravity-implant",
+  "displayName": "Antigravity Implant",
+  "version": "0.2.0",
+  "description": "Makes the Antigravity agent work more like Claude Code / Codex: it talks while it works, answers questions first, shows evidence mid-task, checks its wrap-up, applies live rules mid-session, checkpoints and rewinds files, blocks dangerous commands, flags syntax errors right after edits, and adds a live side panel.",
+  "author": { "name": "antigravity-implant contributors" },
+  "logo": "assets/logo.svg",
+  "suggestedPrompts": [
+    "이 폴더 구조를 살펴보고 무엇이 있는지 설명해줘",
+    "방금 바꾼 화면을 스크린샷으로 보여줘",
+    "/doctor 로 업그레이드가 잘 도는지 점검해줘"
+  ]
+}

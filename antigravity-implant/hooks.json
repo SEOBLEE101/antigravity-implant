@@ -1,0 +1,34 @@
+{
+  "antigravity-implant": {
+    "PreInvocation": [
+      { "type": "command", "command": "node hooks/pre_invocation.mjs", "timeout": 10 }
+    ],
+    "Stop": [
+      { "type": "command", "command": "node hooks/stop_gate.mjs", "timeout": 10 }
+    ]
+  },
+  "antigravity-implant-danger-guard": {
+    "PreToolUse": [
+      {
+        "matcher": "run_command",
+        "hooks": [ { "type": "command", "command": "node hooks/danger_guard.mjs", "timeout": 5 } ]
+      }
+    ]
+  },
+  "antigravity-implant-folder-grants": {
+    "PostToolUse": [
+      {
+        "matcher": "read_file|view_file|view_file_outline|list_dir|grep_search|find_by_name|write_file|edit_file|write_to_file|replace_file_content|multi_replace_file_content",
+        "hooks": [ { "type": "command", "command": "node hooks/folder_grants.mjs", "timeout": 10 } ]
+      }
+    ]
+  },
+  "antigravity-implant-syntax-check": {
+    "PostToolUse": [
+      {
+        "matcher": "write_file|edit_file|write_to_file|replace_file_content|multi_replace_file_content",
+        "hooks": [ { "type": "command", "command": "node hooks/syntax_check.mjs", "timeout": 10 } ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,7 @@
+# Google 의 사이드카 SDK 사본 (각자 PC 의 Antigravity 앱에 이미 있음 — 재배포하지 않음)
+antigravity-implant/sidecars/live-cockpit/sdk/
+node_modules/
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
