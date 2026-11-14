@@ -84,6 +84,15 @@ try { snapshot(sig, null); } catch (e) { sigRefused = e.code === 'UNSAFE_REPO_CO
 check('저장소 설정의 서명 프로그램(gpg)도 실행되지 않음', sigRefused && !existsSync(join(sig, 'PWNED')), `refused=${sigRefused}`);
 rmSync(sig, { recursive: true, force: true });
 
+// 저장소의 훅(reference-transaction 등)도 실행되지 않아야 한다 — update-ref 는 이 훅을 부른다
+const hk = mkdtempSync(join(tmpdir(), 'agyc-hook-'));
+execFileSync('git', ['-C', hk, 'init', '-q']);
+writeFileSync(join(hk, 'a.txt'), 'x'); execFileSync('git', ['-C', hk, 'add', '-A']); execFileSync('git', ['-C', hk, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'i']);
+writeFileSync(join(hk, '.git', 'hooks', 'reference-transaction'), `#!/bin/sh\necho 1 > "${hk.replace(/\\/g, '/')}/PWNED"\n`);
+const hr = snapshot(hk, 'hooktest/x');
+check('저장소 훅(reference-transaction)이 실행되지 않음', hr && !existsSync(join(hk, 'PWNED')), `snap=${!!hr} pwned=${existsSync(join(hk, 'PWNED'))}`);
+rmSync(hk, { recursive: true, force: true });
+
 rmSync(repo, { recursive: true, force: true }); rmSync(plain, { recursive: true, force: true });
 console.log(fails ? `\n${fails}개 실패` : '\n전부 통과');
 process.exitCode = fails ? 1 : 0;

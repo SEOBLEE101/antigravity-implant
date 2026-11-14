@@ -4,7 +4,7 @@
 //  - .gitignore 된 파일, 비밀 파일 패턴(.env, *.pem, *.key, credentials …), 5MB 넘는 새 파일은 담지 않는다
 // Claude Code 의 체크포인트(/rewind), Codex 의 undo 를 흉내 낸 것.
 import { execFileSync } from 'node:child_process';
-import { readFileSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { readFileSync, mkdirSync, rmSync, statSync, writeFileSync, readdirSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { DATA_DIR, atomicWrite, ID_RE } from './common.mjs';
@@ -12,13 +12,24 @@ import { DATA_DIR, atomicWrite, ID_RE } from './common.mjs';
 export const CP_DIR = join(DATA_DIR, 'checkpoints');
 const MAX_NEW_FILE = 5 * 1024 * 1024;
 const KEEP = 50;
+// 훅 경로로 쓸 빈 폴더 (절대 경로). update-ref 는 reference-transaction 훅을 부르므로 저장소 훅이 돌지 않게 여기를 가리킨다.
+// 누가 안에 파일을 넣어 두었으면 쓰지 않고 새 빈 폴더를 만든다.
+function emptyHooksDir() {
+  const base = join(DATA_DIR, 'empty-hooks');
+  try {
+    mkdirSync(base, { recursive: true });
+    if (!readdirSync(base).length) return base;
+  } catch {}
+  return mkdtempSync(join(DATA_DIR, 'empty-hooks-'));
+}
+const EMPTY_HOOKS = emptyHooksDir();
 // 줄바꿈 변환 끔(바이트 그대로), 외부 프로그램(fsmonitor·diff 외부 도구·textconv) 실행 끔
 const GIT_SAFE = ['-c', 'user.name=antigravity-implant', '-c', 'user.email=agyc@localhost', '-c', 'core.quotepath=off',
   '-c', 'core.autocrlf=false', '-c', 'core.safecrlf=false', '-c', 'core.fsmonitor=false',
   // 메모리 절약: 자동 gc 끔, 팩 매핑 상한, 스레드 1개
   '-c', 'gc.auto=0', '-c', 'core.packedGitLimit=256m', '-c', 'core.packedGitWindowSize=32m', '-c', 'pack.threads=1',
   // 외부 프로그램을 부를 수 있는 기능은 강제로 끈다 (서명, 훅 경로)
-  '-c', 'commit.gpgSign=false', '-c', 'tag.gpgSign=false', '-c', 'core.hooksPath=NUL'];
+  '-c', 'commit.gpgSign=false', '-c', 'tag.gpgSign=false', '-c', `core.hooksPath=${EMPTY_HOOKS}`];
 const MAX_UNTRACKED = 5000; // 새 파일이 이보다 많으면 새 파일은 담지 않는다 (빌드 산출물 폴더 등)
 const HOME_ROOT = homedir().replace(/[\\/]+$/, '').toLowerCase();
 const SECRET_RE = /(^|[\\/])(\.env(\..*)?|.*\.(pem|key|p12|pfx|keystore|jks)|id_(rsa|dsa|ecdsa|ed25519)(\.pub)?|.*credential.*|.*secret.*|\.npmrc|\.pypirc|\.netrc|.*\.kdbx)$/i;
