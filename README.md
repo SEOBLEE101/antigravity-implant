@@ -1,43 +1,45 @@
 # Antigravity Implant
 
-**한국어** | [English](README.en.md)
+**English** | [한국어](README.ko.md)
 
-**Google Antigravity 를 Claude Code · Codex 처럼.** 말없이 도구만 돌리던 에이전트가 일하면서 말하고, 질문에 먼저 답하고, 중간 증거를 보여주고, 끝낼 때 무엇을 확인했는지 말하게 만드는 Antigravity 플러그인입니다. 앱 파일은 건드리지 않고, 플러그인 폴더 하나만 넣으면 됩니다.
+**Make Google Antigravity work like Claude Code and Codex.** An Antigravity plugin that turns an agent which silently fires tool calls into one that talks while it works, answers your questions first, shows evidence mid-task, and tells you what it verified before it stops. It does not patch the app — you just drop one plugin folder in.
 
-## 이런 분께
+> The agent-facing texts (hook reminders, skills, rules) are written in Korean, the author's working language. Antigravity models follow them fine; translate `rules/AGENTS.md` and the skills if you prefer English output.
 
-- Antigravity 에이전트가 생각(thinking)에서만 말하고, 화면에는 도구 호출만 줄줄이 찍혀서 답답하신 분
-- 작업 도중 `GEMINI.md` 를 고쳤는데 턴이 끝날 때까지 반영되지 않아 곤란하셨던 분
-- Claude Code·Codex 의 `/review`, `/rewind`, 할 일 목록, 진행 보고에 익숙하신 분
+## Who is this for
 
-## 무엇이 달라지나
+- You are tired of the Antigravity agent "thinking" in private while the screen only shows a stream of tool calls.
+- You edited `GEMINI.md` mid-task and it was ignored until the turn ended.
+- You are used to Claude Code / Codex features like `/review`, `/rewind`, todo lists and progress updates.
 
-| 불편 | Antigravity Implant |
+## What changes
+
+| Pain point | Antigravity Implant |
 |---|---|
-| 말없이 일한다 | 도구를 부르기 전마다 `NN% 순조롭게 진행중입니다` + 지금 할 일 한 문장 |
-| 중간 증거가 없다 | 스크린샷을 찍으면 "보여줘라" 알림, 옆 패널에 캡처가 실시간으로 쌓임 |
-| 도중에 고친 규칙이 안 먹힌다 | 사용자가 고친 `GEMINI.md`·`AGENTS.md` 를 다음 모델 호출에 바로 반영 |
-| 작업 중 말을 안 듣는다 | 도중에 온 메시지에 먼저 반응, 패널에서 메시지 보내기·⏸ 일시정지 |
-| 끝났다면서 확인을 안 한다 | 파일을 고쳤는데 무엇을 확인했는지 없으면 한 번만 마무리를 다시 쓰게 함 |
-| 잘못 고친 걸 되돌릴 수 없다 | 메시지마다 git 자동 체크포인트 → `/rewind` 또는 패널 버튼으로 되돌리기·취소 |
-| 위험한 명령을 그냥 돌린다 | 드라이브 통째 삭제·포맷 등은 항상 차단, 강제 푸시 등은 사용자가 말했을 때만 |
-| 문법 오류를 모르고 지나간다 | `.js/.json/.py` 를 고친 직후 문법 검사 → 오류면 바로 알림 |
-| 폴더 밖 파일마다 권한을 묻는다 | 한 번 허락한 파일의 폴더를 기억해 다음부터 묻지 않음 |
+| Works silently | Before each tool call: a progress line (`NN% …`) plus one sentence on what it is about to do |
+| No evidence mid-task | After a screenshot it is told to show it; the side panel collects captures in real time |
+| Rule edits mid-task are ignored | Your edits to `GEMINI.md` / `AGENTS.md` are injected on the very next model call |
+| Ignores you while busy | Replies to mid-task messages first; send messages or ⏸ pause from the panel |
+| Says "done" without checking | If files changed but the final answer says nothing about verification, it is asked once to wrap up properly |
+| No undo | Automatic git checkpoint on every message → `/rewind` or a panel button to restore / undo |
+| Runs dangerous commands | Wiping a drive, formatting, etc. are always blocked; force-push, `reset --hard`, registry edits only pass when you asked for them |
+| Misses syntax errors | `.js/.json/.py` files are syntax-checked right after an edit; errors are reported on the next call |
+| Asks permission for every file outside the workspace | Once you allow a file, its folder is remembered so you are not asked again |
 
-## 들어 있는 것
+## What's inside
 
 | | |
 |---|---|
-| **훅** | 진행 보고 · 작업 중 메시지 우선 · 도중에 고친 규칙 즉시 반영 · 반복/막힘 감지 · 컨텍스트 경고 · 마무리 점검 · 조기 종료 감지 · 위험 명령 차단 · 고친 파일 문법 검사 · 폴더 단위 권한 기억 · 자동 체크포인트 |
-| **스킬 13개** | `/plan-first` `/code-review` `/rewind` `/remember` `/init-project` `/handoff` `/commit` `/pr` `/worktree` `/doctor` `/status-report` `/computer-use` `evidence-checkpoint` |
-| **Live Cockpit 패널** | 진행 · 계획(task.md) · 스크린샷 · git 변경 · 되돌리기 · 실시간 규칙 · 훅 기록 · 토큰 · 모드 · 메시지 보내기 · ⏸ 일시정지 |
-| **CLI** | 상태줄, 되돌리기, 진단 |
+| **Hooks** | progress reporting · mid-task messages first · live rule reload · loop / stuck detection · context warnings · wrap-up check · early-stop detection · dangerous-command guard · post-edit syntax check · folder-level permission memory · automatic checkpoints |
+| **13 skills** | `/plan-first` `/code-review` `/rewind` `/remember` `/init-project` `/handoff` `/commit` `/pr` `/worktree` `/doctor` `/status-report` `/computer-use` `evidence-checkpoint` |
+| **Live Cockpit panel** | progress · plan (task.md) · screenshots · git diff · rewind · live rules · hook log · tokens · mode · send message · ⏸ pause |
+| **CLI** | status line, rewind, doctor |
 
-자세한 설명(설정, 체크포인트, 위험 명령 차단 규칙, 한계): [antigravity-implant/README.md](antigravity-implant/README.md)
+Full reference (settings, checkpoints, guard rules, limits) — Korean: [antigravity-implant/README.md](antigravity-implant/README.md)
 
-## 설치 (Windows)
+## Install (Windows)
 
-필요: [Antigravity](https://antigravity.google), node 18+, git(체크포인트용).
+Requirements: [Antigravity](https://antigravity.google), node 18+, git (for checkpoints).
 
 ```powershell
 git clone https://github.com/SEOBLEE101/antigravity-implant.git
@@ -45,54 +47,54 @@ cd antigravity-implant
 powershell -ExecutionPolicy Bypass -File .\install.ps1 -StatusLine
 ```
 
-- 앱을 다시 시작하고, 대화 화면 오른쪽 패널의 **`+` → Extensions → Live Cockpit** 으로 엽니다(대화마다 한 번). 처음 한 번은 왼쪽 **Customizations → antigravity-implant → UI extensions → Live Cockpit** 에서 Running 인지 확인하세요.
-- 점검: 새 대화에서 `/doctor`
-- 제거: `install.ps1 -Uninstall` (데이터 폴더는 남김)
+- Restart the app, then open the panel from the right-hand pane of a conversation: **`+` → Extensions → Live Cockpit** (once per conversation). The first time, check under **Customizations → antigravity-implant → UI extensions → Live Cockpit** that it says Running.
+- Health check: `/doctor` in a new conversation
+- Uninstall: `install.ps1 -Uninstall` (your data folder is kept)
 
-`install.ps1` 은 플러그인을 임시 폴더에서 검증한 뒤 `%USERPROFILE%\.gemini\config\plugins\` 에 넣기만 합니다. 관리자 권한, 레지스트리, 권한 허용 목록, 외부 다운로드는 건드리지 않습니다. `-StatusLine` 은 agy CLI 설정을 백업한 뒤 상태줄 한 항목만 추가합니다.
+`install.ps1` validates the plugin in a temporary folder and then places it in `%USERPROFILE%\.gemini\config\plugins\`. It does not touch admin rights, the registry, permission allow-lists or the network. `-StatusLine` backs up the agy CLI settings and adds a single status-line entry.
 
-### 선택: 데스크톱 앱 조작 (computer use)
+### Optional: desktop app control (computer use)
 
-외부 오픈소스 [sandraschi/windows-computer-use-mcp](https://github.com/sandraschi/windows-computer-use-mcp) (MIT) 를 고정 커밋으로 받아 설치합니다. 기본 설치에는 들어 있지 않습니다.
+Installs the open-source [sandraschi/windows-computer-use-mcp](https://github.com/sandraschi/windows-computer-use-mcp) (MIT) at a pinned commit. Not part of the default install.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\install-computer-use.ps1
 ```
 
-실행 전에 확인을 묻고, `mcp_config.json` 을 백업한 뒤 서버 하나만 추가합니다(키로거·얼굴인식·궤적 기록·클립보드 읽기 끔). 필요: git, [uv](https://docs.astral.sh/uv/).
+It asks for confirmation, backs up `mcp_config.json`, and registers one server with keylogging, face detection, trajectory logging and clipboard reading turned off. Requires git and [uv](https://docs.astral.sh/uv/).
 
-## 안전
+## Safety
 
-- 위험 명령 차단 훅은 `run_command` 에만 걸리고 `allow` 를 절대 내지 않습니다(사용자 권한 설정 그대로). `cmd /c "…"`·`powershell -c "…"`·`-EncodedCommand` 안에 숨긴 명령도 풀어서 봅니다.
-- 체크포인트는 작업 폴더·인덱스·브랜치를 건드리지 않고, 비밀 파일·큰 파일은 담지 않으며, 저장소 설정의 filter·서명·훅 프로그램을 실행하지 않습니다. 메모리·시간 상한이 있습니다.
-- 패널은 `127.0.0.1` 에만 열리고, 쓰기 요청은 토큰이 있어야 받으며, 다른 호스트 이름으로 온 요청은 거부합니다.
-- 실시간 규칙은 에이전트가 명령을 돌리는 사이에 바뀌면 무시합니다(명령으로 바꿨을 수 있으므로).
-- 다른 모델(Gemini Carbon 오케스트레이터 swarm)로 전체 정적 검사 2번, 보안 자동 검토 3번을 거쳐 지적 사항을 고쳤습니다.
+- The dangerous-command guard only hooks `run_command` and never returns `allow` (your permission settings stay in charge). It also unpacks commands hidden inside `cmd /c "…"`, `powershell -c "…"` and `-EncodedCommand`.
+- Checkpoints never touch your working tree, index or branches, skip secret-looking and large files, and never run filter / signing / hook programs from the repository's own config. Memory and time limits apply.
+- The panel binds to `127.0.0.1` only, requires a token for write requests, and rejects requests with any other host name.
+- Live rules changed while the agent was running commands are ignored (a command could have written them).
+- Reviewed twice end-to-end by another model (Gemini Carbon orchestrator swarm) and three times by an automated security review; all findings were fixed.
 
-## 시험
+## Tests
 
 ```powershell
 node tests/run-all.mjs
 ```
 
-시험 162개. 임시 폴더를 가짜 사용자 폴더로 써서 실제 설정(`~/.gemini`)을 건드리지 않습니다. `cockpit-rewind-test` 는 앱이 깔아 둔 `sidecar_sdk` 가 있어야 하고, 없으면 건너뜁니다.
+162 checks. Each run uses a temporary fake home folder, so your real `~/.gemini` is never touched. `cockpit-rewind-test` needs the `sidecar_sdk` that the Antigravity app installs and is skipped otherwise.
 
-## 왜 이렇게 만들었나 (실험으로 확인한 것)
+## Why it is built this way (verified by experiment)
 
-- Antigravity 훅 6종(`SessionStart` `PreInvocation` `PreToolUse` `PostToolUse` `PostInvocation` `Stop`)이 모두 실제로 돈다. 훅 한 번 약 0.1초.
-- `PreInvocation` 의 `ephemeralMessage` 는 그 호출에만, `systemMessage` 는 대화에 남는다. → 매 호출 알림은 ephemeral, 규칙 변경처럼 계속 지켜야 하는 것만 systemMessage.
-- `PreToolUse` 는 실패하면 도구를 막는다(빈 응답·오류·깨진 출력 모두). `allow` 는 사용자 권한 설정을 건너뛴다. → 차단 훅은 `run_command` 에만, 기본값은 `ask`.
-- `PostToolUse` 의 `injectSteps` 는 무시된다. → 문법 검사 결과는 파일로 넘겨 다음 `PreInvocation` 이 알린다.
-- `Stop` 의 `decision: "continue"` 는 동작하고, 두 번째 종료 때 `continuationActive` 가 온다. → 마무리 점검은 턴당 한 번.
-- 아무 규칙 없는 Gemini Flash 는 거의 항상 글 없이 도구부터 부른다. 알림을 넣으면 매번 설명을 먼저 쓴다.
+- All six Antigravity hook events (`SessionStart` `PreInvocation` `PreToolUse` `PostToolUse` `PostInvocation` `Stop`) really fire; one hook run takes about 0.1 s.
+- In `PreInvocation`, `ephemeralMessage` lasts for that call only while `systemMessage` stays in the conversation → per-call reminders are ephemeral; only things that must persist (rule changes) use systemMessage.
+- `PreToolUse` fails closed (empty output, errors, broken JSON all block the tool), and `allow` bypasses the user's permission settings → the guard hooks `run_command` only and defaults to `ask`.
+- `PostToolUse` `injectSteps` is ignored → syntax-check results are handed over through a file and reported by the next `PreInvocation`.
+- `Stop` with `decision: "continue"` works and the second stop carries `continuationActive` → the wrap-up check runs at most once per turn.
+- Without any rules, Gemini Flash almost always calls tools with no visible text; with the reminder it explains first every time.
 
-## 한계
+## Limitations
 
-- Windows 에서만 시험했습니다 (Antigravity 앱 2.31, agy CLI 1.5.8).
-- 작업 도중 보낸 메시지·일시정지는 실행 중인 도구를 끊지 않고, 다음 모델 호출 때 적용됩니다.
-- 훅은 "캡처를 보여줘라"고 알릴 수는 있지만, 모델이 스스로 캡처를 시작하게 강제하지는 못합니다. 찍힌 캡처는 패널 「증거」 탭에 항상 뜹니다.
-- 패널은 대화마다 오른쪽 패널의 `+` 메뉴로 한 번 열어야 합니다.
+- Tested on Windows only (Antigravity app 2.31, agy CLI 1.5.8).
+- Mid-task messages and pause never interrupt a running tool; they apply on the next model call.
+- Hooks can tell the model to show a screenshot it took, but cannot force it to take one. Captures that do exist always appear in the panel's Evidence tab.
+- The panel has to be opened once per conversation from the right-hand pane's `+` menu.
 
-## 라이선스
+## License
 
-MIT. 패널이 쓰는 `sidecar_sdk` 는 Google 이 Antigravity 앱과 함께 배포하는 파일이라 이 저장소에 넣지 않았습니다(설치된 앱의 것을 그대로 씀). Antigravity 는 Google 의 상표이며, 이 프로젝트는 Google 과 관련이 없습니다.
+MIT. The panel uses the `sidecar_sdk` that Google ships with the Antigravity app; it is not included in this repository (the installed copy is used). Antigravity is a trademark of Google; this project is not affiliated with Google.
