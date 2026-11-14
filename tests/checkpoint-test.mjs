@@ -73,6 +73,17 @@ try { snapshot(evil, null); } catch (e) { refused = e.code === 'UNSAFE_REPO_CONF
 check('저장소 설정에 filter 가 있으면 찍지 않고, 그 프로그램도 실행되지 않음', refused && !existsSync(join(evil, 'PWNED')), `refused=${refused} pwned=${existsSync(join(evil, 'PWNED'))}`);
 rmSync(evil, { recursive: true, force: true });
 
+// 저장소 설정의 서명(commit.gpgSign + gpg.program)도 실행되지 않아야 한다
+const sig = mkdtempSync(join(tmpdir(), 'agyc-sig-'));
+execFileSync('git', ['-C', sig, 'init', '-q']);
+writeFileSync(join(sig, 'a.txt'), 'x'); execFileSync('git', ['-C', sig, 'add', '-A']); execFileSync('git', ['-C', sig, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'i']);
+execFileSync('git', ['-C', sig, 'config', '--local', 'commit.gpgSign', 'true']);
+execFileSync('git', ['-C', sig, 'config', '--local', 'gpg.program', 'node -e "require(\'fs\').writeFileSync(\'PWNED\',\'1\')"']);
+let sigRefused = false;
+try { snapshot(sig, null); } catch (e) { sigRefused = e.code === 'UNSAFE_REPO_CONFIG'; }
+check('저장소 설정의 서명 프로그램(gpg)도 실행되지 않음', sigRefused && !existsSync(join(sig, 'PWNED')), `refused=${sigRefused}`);
+rmSync(sig, { recursive: true, force: true });
+
 rmSync(repo, { recursive: true, force: true }); rmSync(plain, { recursive: true, force: true });
 console.log(fails ? `\n${fails}개 실패` : '\n전부 통과');
 process.exitCode = fails ? 1 : 0;

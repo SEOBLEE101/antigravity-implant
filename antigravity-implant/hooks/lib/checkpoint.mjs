@@ -16,7 +16,9 @@ const KEEP = 50;
 const GIT_SAFE = ['-c', 'user.name=antigravity-implant', '-c', 'user.email=agyc@localhost', '-c', 'core.quotepath=off',
   '-c', 'core.autocrlf=false', '-c', 'core.safecrlf=false', '-c', 'core.fsmonitor=false',
   // 메모리 절약: 자동 gc 끔, 팩 매핑 상한, 스레드 1개
-  '-c', 'gc.auto=0', '-c', 'core.packedGitLimit=256m', '-c', 'core.packedGitWindowSize=32m', '-c', 'pack.threads=1'];
+  '-c', 'gc.auto=0', '-c', 'core.packedGitLimit=256m', '-c', 'core.packedGitWindowSize=32m', '-c', 'pack.threads=1',
+  // 외부 프로그램을 부를 수 있는 기능은 강제로 끈다 (서명, 훅 경로)
+  '-c', 'commit.gpgSign=false', '-c', 'tag.gpgSign=false', '-c', 'core.hooksPath=NUL'];
 const MAX_UNTRACKED = 5000; // 새 파일이 이보다 많으면 새 파일은 담지 않는다 (빌드 산출물 폴더 등)
 const HOME_ROOT = homedir().replace(/[\\/]+$/, '').toLowerCase();
 const SECRET_RE = /(^|[\\/])(\.env(\..*)?|.*\.(pem|key|p12|pfx|keystore|jks)|id_(rsa|dsa|ecdsa|ed25519)(\.pub)?|.*credential.*|.*secret.*|\.npmrc|\.pypirc|\.netrc|.*\.kdbx)$/i;
@@ -29,13 +31,16 @@ function git(cwd, args, opts = {}) {
 }
 const lines0 = (s) => String(s || '').split('\0').filter(Boolean);
 
+// 저장소 자체 설정(local·worktree 범위, include 로 끌어온 것 포함)에 외부 프로그램을 부를 수 있는 항목이 있나
+const EXEC_KEYS = /^(filter\.|include\.|includeif\.|extensions\.worktreeconfig|core\.(fsmonitor|hookspath|sshcommand|gitproxy|askpass|editor|pager|alternaterefscommand)|diff\..*\.(textconv|command)|merge\..*\.driver|gpg\.|commit\.gpgsign|tag\.gpgsign|credential\.|uploadpack\.|receive\.)/i;
 export function hasLocalExecConfig(repo) {
   try {
-    const out = git(repo, ['config', '--local', '--name-only', '--get-regexp', '^(filter\\.|include\\.|includeif\\.|core\\.(fsmonitor|hookspath|sshcommand|gitproxy)|diff\\..*\\.(textconv|command)|merge\\..*\\.driver)'], { timeout: 5000 });
-    return out.trim().length > 0;
-  } catch (e) {
-    return e.status !== 1; // 1 = 해당 설정 없음(정상). 그 밖의 오류면 안전하게 "있다"로 본다
-  }
+    const out = git(repo, ['config', '--includes', '--show-scope', '--name-only', '--list'], { timeout: 5000 });
+    return out.split(/\r?\n/).some((line) => {
+      const m = line.match(/^(\w+)\s+(.+)$/);
+      return m && /^(local|worktree)$/i.test(m[1]) && EXEC_KEYS.test(m[2].trim()); // command 범위 = 우리가 -c 로 넣은 안전 설정이라 제외
+    });
+  } catch { return true; } // 확인을 못 하면 안전하게 "있다"로 본다
 }
 
 export function repoRoot(dir) {
@@ -74,7 +79,7 @@ export function snapshot(dir, refName) {
     });
     if (take.length) git(repo, ['add', '--pathspec-from-file=-', '--pathspec-file-nul', '--'], { env, input: take.join('\0') + '\0', timeout: 30000 });
     const tree = git(repo, ['write-tree'], { env }).trim();
-    const commit = git(repo, ['commit-tree', tree, ...(parent ? ['-p', parent] : []), '-m', `antigravity-implant checkpoint ${refName || ''}`.trim()]).trim();
+    const commit = git(repo, ['commit-tree', '--no-gpg-sign', tree, ...(parent ? ['-p', parent] : []), '-m', `antigravity-implant checkpoint ${refName || ''}`.trim()]).trim();
     if (refName) git(repo, ['update-ref', `refs/agyc/${refName}`, commit]);
     return { repo, commit, tree, parent, skipped };
   } finally {

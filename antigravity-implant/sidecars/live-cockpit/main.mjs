@@ -8,7 +8,7 @@ import { readFileSync, writeFileSync, readdirSync, existsSync, statSync, openSyn
 import { homedir } from 'node:os';
 import { join, dirname, extname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { randomBytes, createHash } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import http from 'node:http';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -349,11 +349,7 @@ app.api('/api/live-rules', (body) => {
   // 훅은 주석을 뺀 앞 2000자만 넣는다(liveRulesMaxChars). 그보다 길면 잘리지 않게 저장 전에 알린다.
   if (text.replace(/<!--[\s\S]*?-->/g, '').trim().length > 2000) return jsonError('실시간 규칙은 주석을 빼고 2000자까지만 적용됩니다. 줄여 주세요.', 413);
   if (text.length > 20000) return jsonError('too long', 413);
-  try {
-    atomicWrite(LIVE_RULES, text);
-    // 패널에서 저장한 내용이라는 지문 — 훅은 명령이 돈 뒤 바뀐 규칙도 이 지문이 맞으면 받아들인다
-    atomicWrite(join(DATA_DIR, 'live_rules.sha256'), createHash('sha256').update(text).digest('hex'));
-  } catch (e) { return jsonError('저장 실패: ' + e.code, 500); }
+  try { atomicWrite(LIVE_RULES, text); } catch (e) { return jsonError('저장 실패: ' + e.code, 500); }
   return { ok: true, mtime: fileStamp(LIVE_RULES) };
 }, 'POST');
 

@@ -108,7 +108,7 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1 -StatusLine
 - 메시지를 보낼 때마다 작업 폴더가 git 저장소면 상태를 사진으로 남깁니다(커밋 안 한 변경 + `.gitignore` 안 된 새 파일, 비밀 파일 패턴·5MB 넘는 새 파일 제외). **작업 폴더·인덱스·브랜치는 건드리지 않습니다** (임시 인덱스 + `refs/agyc/…`).
 - 되돌리면 그때 있던 파일이 그때 내용으로 돌아가고, 그 뒤 새로 생긴 파일은 지우지 않습니다. 되돌리기 직전 상태도 보관돼 취소할 수 있습니다.
 - 명령(PowerShell): `node "$env:USERPROFILE\.gemini\config\plugins\antigravity-implant\cli\rewind.mjs" list latest` (`diff latest N`, `restore latest N`, `undo latest` — 대화 ID 자리에 `latest` 또는 실제 ID 를 꼭 적습니다). 에이전트가 그 대화에서 작업 중이면 되돌리지 않습니다(`--force` 로 강제). cmd 에서는 `"%USERPROFILE%\..."`.
-- 저장소 자체 설정(`.git/config`)에 filter 프로그램·include 같은 실행 설정이 있으면 그 저장소는 찍지 않습니다(git 이 그 프로그램을 실행할 수 있으므로). 사용자 전역 설정의 git-lfs 등은 괜찮습니다.
+- 저장소 자체 설정(`.git/config`, worktree 설정, include 로 끌어온 설정)에 filter 프로그램·서명(gpg)·include 같은 외부 프로그램 실행 설정이 있으면 그 저장소는 찍지 않습니다(git 이 그 프로그램을 실행할 수 있으므로). 서명과 훅 경로는 항상 강제로 끕니다. 사용자 전역 설정의 git-lfs 등은 괜찮습니다.
 - 폴더 허락 규칙은 끝에 `\` 를 붙여 씁니다(`read_file(D:\proj\)`). 앞부분 일치라 `D:\proj` 로 쓰면 `D:\project-x` 까지 허락되기 때문입니다(agy CLI 로 확인).
 - 메모리·시간 상한: 작업자는 node 힙 256MB, git 명령 하나당 30초. 새 파일이 5000개를 넘으면 새 파일은 빼고 찍고, 사용자 폴더·드라이브 전체가 저장소면 찍지 않습니다. 시간 초과가 난 저장소는 하루 동안 건너뜁니다(`errors.log` 에 기록). 같은 대화의 작업자는 한 번에 하나만 돕니다.
 - 정리: 저장소에서 `git for-each-ref refs/agyc` 로 보고 `git update-ref -d <ref>`.
@@ -132,7 +132,7 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1 -StatusLine
 - 패널은 Antigravity 앱이 함께 깔아 주는 `sidecar_sdk` 를 씁니다 (`~/.gemini/config/node_modules/sidecar_sdk`). Google 파일이라 이 저장소에는 넣지 않았습니다.
 - 일부 Windows PC(사용자 폴더 이름이 한글 등 ASCII 가 아니고 코드페이지가 UTF-8)에서는 앱이 `"command": "node"` 사이드카를 띄우지 못합니다. 그래서 `sidecar.json` 은 `"node.exe"` 를 씁니다 (PATH 에 node 가 있어야 함).
 - 패널의 쓰기 요청(POST)은 토큰이 있어야 받습니다. 앱이 토큰을 주지 않으면 패널이 스스로 무작위 토큰을 만들어 겁니다. `127.0.0.1`/`localhost` 가 아닌 호스트 이름으로 온 요청은 거부합니다(다른 웹사이트가 몰래 요청하거나 DNS rebinding 으로 읽는 것 차단).
-- 실시간 규칙은 패널에서 저장하면 지문(`live_rules.sha256`)을 남깁니다. 에이전트가 명령을 돌린 뒤 파일이 바뀌었으면 지문이 맞을 때만 받아들입니다.
+- 실시간 규칙은 사용자만 고치는 파일로 봅니다. 에이전트가 명령·서브에이전트를 돌리는 사이에 바뀌었으면(명령으로 고쳤을 수 있으므로) 그 변경은 무시하고, 패널 「훅 기록」에 "무시"로 남깁니다. 그때 직접 저장하신 거라면 한 번 더 저장하면 적용됩니다.
 - 패널 서버는 127.0.0.1 에만 열리고, 변경 보기는 훅이 기록한 이 대화의 작업 폴더에서 읽기 전용 git 명령만 씁니다(외부 diff 도구·textconv 끔, UNC 경로 거부).
 
 ## 알아 둘 한계

@@ -16,7 +16,6 @@ import {
   argPath, normKey,
 } from './lib/common.mjs';
 import { renameSync } from 'node:fs';
-import { createHash } from 'node:crypto';
 
 const READ_TOOLS = new Set(['read_file', 'view_file', 'view_file_outline', 'read_url_content', 'read_browser_page']);
 
@@ -295,15 +294,11 @@ runHook('PreInvocation', (input) => {
   // 파일 내용은 시각이 바뀔 때만 다시 읽는다 (state 에 보관).
   const liveM = fileMtime(cfg.liveRulesFile);
   // 실시간 규칙은 사용자만 고치는 파일이다. 그 사이 에이전트가 그 파일을 고쳤거나, 명령·서브에이전트가 돌았거나(명령으로도 고칠 수 있음),
-  // 도구 인자에 그 이름이 나오면 — 패널에서 저장한 내용(지문이 맞음)이 아닌 한 받아들이지 않는다.
+  // 도구 인자에 그 이름이 나오면 그 변경은 받아들이지 않는다. 예외(지문 등)는 두지 않는다 — 훅이 읽을 수 있는 것은 같은 사용자 권한으로
+  // 도는 에이전트도 쓸 수 있어 위조할 수 있기 때문. 사용자가 그런 때 저장했다면 패널 「훅 기록」에 "무시"가 보이고, 다시 저장하면 적용된다.
   if (liveM !== state.liveRulesMtime && liveM) {
     const suspicious = ranCommand || editedPaths.includes(normKey(cfg.liveRulesFile)) || sinceLast.some((c) => /live_rules/i.test(JSON.stringify(c.args || {})));
-    let fromPanel = false;
-    try {
-      const want = readFileSync(join(DATA_DIR, 'live_rules.sha256'), 'utf8').trim();
-      fromPanel = !!want && want === createHash('sha256').update(readFileSync(cfg.liveRulesFile, 'utf8')).digest('hex');
-    } catch {}
-    if (suspicious && !fromPanel && state.liveRulesMtime !== undefined) { kinds.push('실시간 규칙 바뀜(도구가 바꿨을 수 있어 무시)'); state.liveRulesMtime = liveM; }
+    if (suspicious && state.liveRulesMtime !== undefined) { kinds.push('실시간 규칙 바뀜(명령이 도는 중이라 무시 — 다시 저장하면 적용)'); state.liveRulesMtime = liveM; }
   }
   if (liveM !== state.liveRulesMtime) {
     state.liveRulesText = liveM ? readText(cfg.liveRulesFile, cfg.liveRulesMaxChars) : '';

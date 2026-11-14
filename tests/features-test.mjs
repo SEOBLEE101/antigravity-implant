@@ -130,13 +130,18 @@ try {
     writeFileSync(cm.f, readFileSync(cm.f, 'utf8') + JSON.stringify({ step_index: 9, status: 'DONE', type: 'PLANNER_RESPONSE', source: 'MODEL', content: '10% 순조롭게 진행중입니다\n명령', tool_calls: [{ name: 'run_command', args: { CommandLine: 'echo hi' } }] }) + '\n' + JSON.stringify({ step_index: 10, status: 'DONE', type: 'GENERIC', content: 'ok' }) + '\n');
     const e1 = run('pre_invocation.mjs', { conversationId: cm.conv, transcriptPath: cm.f, modelName: 'claude-opus-5-5', invocationNum: 1 });
     check('명령이 돈 뒤 바뀐 실시간 규칙은 무시', !/EVIL-LIVE/.test(injected(e1.out)), injected(e1.out).slice(0, 200));
-    const okText = '패널에서 저장한 규칙 [PANEL-LIVE]';
-    writeFileSync(live, okText);
+    const e1b = run('pre_invocation.mjs', { conversationId: cm.conv, transcriptPath: cm.f, modelName: 'claude-opus-5-5', invocationNum: 2 });
+    check('무시한 변경은 다음 호출에도 계속 무시', !/EVIL-LIVE/.test(injected(e1b.out)), injected(e1b.out).slice(0, 200));
+    // 명령 없이 지나간 뒤 사용자가 다시 저장하면 적용 (지문 같은 예외는 두지 않음 — 위조 가능하므로)
+    writeFileSync(live, '사용자가 다시 저장한 규칙 [PANEL-LIVE]');
+    const e2 = run('pre_invocation.mjs', { conversationId: cm.conv, transcriptPath: cm.f, modelName: 'claude-opus-5-5', invocationNum: 3 });
+    check('명령이 없을 때 다시 저장하면 적용', /PANEL-LIVE/.test(injected(e2.out)), injected(e2.out).slice(0, 200));
     mkdirSync(DATA, { recursive: true });
-    writeFileSync(join(DATA, 'live_rules.sha256'), createHash('sha256').update(okText).digest('hex'));
+    writeFileSync(join(DATA, 'live_rules.sha256'), 'forged');
+    writeFileSync(live, '위조 지문과 함께 쓴 규칙 [FORGED-LIVE]');
     writeFileSync(cm.f, readFileSync(cm.f, 'utf8') + JSON.stringify({ step_index: 11, status: 'DONE', type: 'PLANNER_RESPONSE', source: 'MODEL', content: '20% 순조롭게 진행중입니다\n명령', tool_calls: [{ name: 'run_command', args: { CommandLine: 'echo hi2' } }] }) + '\n');
-    const e2 = run('pre_invocation.mjs', { conversationId: cm.conv, transcriptPath: cm.f, modelName: 'claude-opus-5-5', invocationNum: 2 });
-    check('패널에서 저장한 규칙(지문 일치)은 명령이 돈 뒤에도 적용', /PANEL-LIVE/.test(injected(e2.out)), injected(e2.out).slice(0, 200));
+    const e3 = run('pre_invocation.mjs', { conversationId: cm.conv, transcriptPath: cm.f, modelName: 'claude-opus-5-5', invocationNum: 4 });
+    check('명령이 돈 사이 바뀐 규칙은 어떤 파일이 있어도 무시', !/FORGED-LIVE/.test(injected(e3.out)) && /PANEL-LIVE/.test(injected(e3.out)), injected(e3.out).slice(0, 200));
     rmSync(join(DATA, 'live_rules.sha256'), { force: true });
   } finally {
     if (liveBak === null) rmSync(live, { force: true }); else writeFileSync(live, liveBak);
