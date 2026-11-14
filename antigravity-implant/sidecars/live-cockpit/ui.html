@@ -23,8 +23,11 @@
   .chip { display: inline-block; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--border, #ddd); font-size: 12px; white-space: nowrap; }
   .chip.warn { border-color: #d4a72c; color: #9a6700; }
   .chip.bad { border-color: #cf222e; color: #cf222e; }
-  nav { display: flex; gap: 2px; margin-top: 8px; }
-  nav button { background: none; border: none; border-bottom: 2px solid transparent; padding: 6px 10px; color: var(--muted-foreground, #777); font: inherit; cursor: pointer; }
+  /* 좁은 옆 패널에서도 탭 이름이 세로로 쪼개지지 않게: 한 줄로 두고 넘치면 가로로 밀어 보기 */
+  nav { display: flex; gap: 0; margin-top: 8px; overflow-x: auto; scrollbar-width: none; }
+  nav::-webkit-scrollbar { display: none; }
+  nav button { flex: none; white-space: nowrap; background: none; border: none; border-bottom: 2px solid transparent; padding: 6px 8px; color: var(--muted-foreground, #777); font: inherit; cursor: pointer; }
+  .nowrap { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
   nav button[aria-selected="true"] { color: var(--foreground, #222); border-bottom-color: var(--primary, #0969da); }
   main { padding: 10px 12px 130px; }
   section[hidden] { display: none; }
@@ -74,12 +77,12 @@
     <span id="ctx" class="chip">컨텍스트 ?</span>
     <span id="todo" class="chip" hidden>할 일 0/0</span>
     <span id="usage" class="chip" title="이 대화에서 모델이 받은(입력)·만든(출력) 토큰 합계" hidden>토큰 ?</span>
-    <label class="muted" for="preset" style="font-size:12px">모드</label>
+    <span class="nowrap"><label class="muted" for="preset" style="font-size:12px">모드</label>
     <select id="preset" title="훅이 얼마나 자주 끼어들지 (Claude Code 의 출력 스타일 비슷)">
       <option value="standard">표준</option>
       <option value="concise">간결 (덜 끼어듦)</option>
       <option value="strict">엄격 (자주 보고)</option>
-    </select>
+    </select></span>
   </div>
   <div class="row" id="pickRow" style="margin-top:4px" hidden>
     <label class="muted" for="pick">대화</label>
