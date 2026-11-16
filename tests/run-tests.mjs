@@ -138,7 +138,7 @@ const injected = (o) => (o.injectSteps || []).map((s) => s.ephemeralMessage || (
   check('규칙 변경: 유지되는 systemMessage 로 (metadata 없이)', (a.out.injectSteps || []).some((s) => s.systemMessage && /\[규칙 변경\]/.test(s.systemMessage.systemMessage) && !s.systemMessage.metadata), a.raw.slice(0, 300));
   const b = run('pre_invocation.mjs', { ...base, invocationNum: 2 });
   check('규칙 변경: 같은 변경은 한 번만', !/\[규칙 변경\]/.test(injected(b.out)), b.raw.slice(0, 300));
-  rmSync(ws, { recursive: true, force: true });
+  rmSync(ws, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }
 // 7-4) 전체 끄기 스위치
 {
@@ -233,7 +233,7 @@ const injected = (o) => (o.injectSteps || []).map((s) => s.ephemeralMessage || (
   writeFileSync(x.f, [...steps0, { type: 'PLANNER_RESPONSE', source: 'MODEL', content: '수정', tool_calls: [{ name: 'edit_file', args: { Path: join(ws, 'AGENTS.md') } }] }, result()].map((s, i) => JSON.stringify({ step_index: i, status: 'DONE', ...s })).join('\n') + '\n', 'utf8');
   const r1 = run('pre_invocation.mjs', { ...base, invocationNum: 1 });
   check('#1 에이전트가 고친 AGENTS.md 는 규칙으로 주입하지 않음', !/악성 규칙/.test(injected(r1.out)), r1.raw.slice(0, 300));
-  rmSync(ws, { recursive: true, force: true });
+  rmSync(ws, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   // #16 질문 오탐: 영어 단어 일부, 코드·경로
   const q1 = transcript([user('show me the stop_gate.mjs and await result, 이름을 바꿔줘')]);
   const r2 = run('pre_invocation.mjs', { conversationId: q1.conv, transcriptPath: q1.f, modelName: 'gemini', invocationNum: 0 });
@@ -265,6 +265,6 @@ const injected = (o) => (o.injectSteps || []).map((s) => s.ephemeralMessage || (
   check('망가진 입력: Stop 은 {}', r2.status === 0 && r2.stdout.trim() === '{}', r2.stdout + r2.stderr);
 }
 
-rmSync(tmp, { recursive: true, force: true });
+rmSync(tmp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 console.log(fails ? `\n${fails}개 실패` : '\n전부 통과');
 process.exitCode = fails ? 1 : 0;

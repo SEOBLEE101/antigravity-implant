@@ -25,16 +25,20 @@ writeFileSync(join(repo, 'a.txt'), 'broken\n');
 
 const TOKEN = 'test-token-' + randomUUID();
 const H = { 'Content-Type': 'application/json', 'X-Sidecar-Token': TOKEN };
-const port = 40000 + Math.floor(Math.random() * 20000); // 고정 포트를 쓰지 않는다 (겹침 방지)
-const srv = spawn(process.execPath, ['main.mjs'], { cwd: join(root, 'sidecars', 'live-cockpit'), env: { ...process.env, ANTIGRAVITY_SIDECAR_UI_TOKEN: TOKEN, ANTIGRAVITY_LS_ADDRESS: '127.0.0.1:1', ANTIGRAVITY_CSRF_TOKEN: 'x', ANTIGRAVITY_SIDECAR_WEB_PORT: String(port) }, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
-let srvErr = '';
-srv.stderr.on('data', (d) => { srvErr += d; });
-const base = `http://127.0.0.1:${port}`;
-let up = false;
-for (let i = 0; i < 40 && !up; i++) { // 최대 10초까지 서버가 뜨길 기다린다
-  await new Promise((r) => setTimeout(r, 250));
-  try { up = (await fetch(`${base}/api/conversations`)).ok; } catch {}
-  if (srv.exitCode != null) break;
+// 서버 띄우기: 무작위 포트로, 한 번에 최대 20초 기다리고, 안 되면(포트 겹침·PC 바쁨) 다른 포트로 최대 3번
+let srv, srvErr = '', port, base, up = false;
+for (let attempt = 0; attempt < 3 && !up; attempt++) {
+  port = 40000 + Math.floor(Math.random() * 20000);
+  srvErr = '';
+  srv = spawn(process.execPath, ['main.mjs'], { cwd: join(root, 'sidecars', 'live-cockpit'), env: { ...process.env, ANTIGRAVITY_SIDECAR_UI_TOKEN: TOKEN, ANTIGRAVITY_LS_ADDRESS: '127.0.0.1:1', ANTIGRAVITY_CSRF_TOKEN: 'x', ANTIGRAVITY_SIDECAR_WEB_PORT: String(port) }, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+  srv.stderr.on('data', (d) => { srvErr += d; });
+  base = `http://127.0.0.1:${port}`;
+  for (let i = 0; i < 80 && !up; i++) {
+    await new Promise((r) => setTimeout(r, 250));
+    try { up = (await fetch(`${base}/api/conversations`)).ok; } catch {}
+    if (srv.exitCode != null) break;
+  }
+  if (!up) srv.kill();
 }
 if (!up) { console.log('FAIL  패널 서버가 뜨지 않음\n      ' + srvErr.slice(0, 800)); srv.kill(); rmSync(repo, { recursive: true, force: true }); process.exit(1); }
 try {
