@@ -12,7 +12,7 @@
 //       기억하지 않는다(파일을 읽거나 쓴 것만). 읽기와 쓰기는 따로. 기억한 폴더는 folder-grants.json 에도 적어 두고,
 //       앱이 옛 설정으로 덮어써 규칙이 빠지면 syncGrants() 가 다시 채운다.
 // 사용: node folder_grants.mjs   (PostToolUse)
-import { readFileSync, existsSync, appendFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, existsSync, appendFileSync, mkdirSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, dirname, win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -82,26 +82,76 @@ export function syncGrants() {
   return rules.length ? addToConfig(rules) : 0;
 }
 
+// 도구 인자는 가끔 JSON 문자열로 한 번 더 감싸져 온다 ("\"C:\\a\"" 나 "\"true\"") → 풀어서 쓴다
+function argVal(v) {
+  if (typeof v !== 'string') return v;
+  const t = v.trim();
+  if (/^"[\s\S]*"$/.test(t)) { try { return JSON.parse(t); } catch {} }
+  return t;
+}
+const isTrue = (v) => { const x = argVal(v); return x === true || x === 'true'; };
+const EXEC_RE = /\.(exe|dll|com|bat|cmd|ps1|psm1|psd1|vbs|js|mjs|cjs|py|msi|sys|lnk)$/i;
+
+// 샌드박스 밖 실행(BypassSandbox)을 사용자가 허락해 성공한 명령에서, 그 명령이 다룬 폴더를 찾는다.
+// 샌드박스의 쓰기 범위는 write_file(폴더\) 허용 규칙을 따른다(이 PC 의 agy CLI 실험, 2026-11-18) → 그 폴더에 쓰기
+// 허락을 기억해 두면 다음부터는 같은 폴더 작업을 샌드박스 안에서 묻지 않고 한다. 실제로 있는 파일·폴더만, 최대 3개,
+// 폴더 단위로 넓혀도 되는 곳(folderFor)만.
+export function bypassFolders(args) {
+  const a = args || {};
+  const cmd = String(argVal(a.CommandLine || a.command || '') || '');
+  const cands = [];
+  const cwd = argVal(a.Cwd || a.cwd);
+  if (typeof cwd === 'string' && /^[a-z]:[\\/]/i.test(cwd)) cands.push(win32.join(cwd, '_'));
+  for (const m of cmd.matchAll(/(?:"([a-z]:[\\/][^"\r\n]*)"|'([a-z]:[\\/][^'\r\n]*)'|(?<![\w])([a-z]:[\\/][^\s"'`;|&<>()]*))/gi)) {
+    let p = (m[1] || m[2] || m[3] || '').replace(/[\\/]+$/, '');
+    if (!p || /[*?]/.test(p)) continue; // 와일드카드는 판단하지 않는다
+    if (EXEC_RE.test(p)) continue; // 실행한 프로그램(C:\ffmpeg\bin\ffmpeg.exe 등)의 폴더에는 쓰기를 넓히지 않는다
+    try {
+      const st = statSync(p);
+      cands.push(st.isDirectory() ? win32.join(p, '_') : p); // 폴더 자체가 나오면 그 폴더, 파일이면 그 파일의 폴더
+    } catch {}
+  }
+  const out = [];
+  for (const c of cands) {
+    const f = folderFor(c);
+    if (f && !out.some((x) => within(f, x))) out.push(f);
+    if (out.length >= 3) break;
+  }
+  return out;
+}
+
+function remember(kind, folder, from) {
+  const added = addToConfig([ruleOf(kind, folder)]);
+  if (!added) return; // 이미 앱 설정의 규칙이 덮고 있음 (또는 쓰기 실패) → 기억할 것 없음
+  const g = load(GRANTS, { read: [], write: [] });
+  const list = (g[kind] ||= []);
+  if (!list.some((x) => within(folder, x.folder))) {
+    list.push({ folder, at: new Date().toISOString(), from: String(from).slice(0, 260) });
+    save(GRANTS, g);
+  }
+}
+
 export function onPostToolUse(input) {
   if (existsSync(join(DATA_DIR, 'off'))) return;
   const cfg = loadConfig();
   if (!cfg.enabled || cfg.folderGrants === false) return;
   if (input.error) return; // 거부됐거나 실패
   const call = input.toolCall || {};
+  const inWorkspace = (p) => (input.workspacePaths || []).some((w) => within(win32.resolve(p), w));
+  if (call.name === 'run_command') {
+    if (cfg.folderGrantsFromCommands === false || !isTrue((call.args || {}).BypassSandbox)) return;
+    for (const folder of bypassFolders(call.args)) {
+      if (!inWorkspace(folder)) remember('write', folder, 'run_command(BypassSandbox): ' + String(argVal((call.args || {}).CommandLine) || '').slice(0, 200));
+    }
+    return;
+  }
   const kind = READ_TOOLS.has(call.name) ? 'read' : WRITE_TOOLS.has(call.name) ? 'write' : null;
   const path = argPath(call.args); // 상대 경로는 작업 폴더 안이라 대상이 아니다 → 절대 경로만
   if (!kind || !path || !/^[a-z]:[\\/]/i.test(path)) return;
-  if ((input.workspacePaths || []).some((w) => within(win32.resolve(path), w))) return; // 작업 폴더 안
+  if (inWorkspace(path)) return; // 작업 폴더 안
   const folder = folderFor(path);
   if (!folder) return;
-  const added = addToConfig([ruleOf(kind, folder)]);
-  if (!added) return; // 이미 앱 설정의 규칙이 덮고 있음 (또는 쓰기 실패) → 기억할 것 없음
-  const g = load(GRANTS, { read: [], write: [] });
-  const list = (g[kind] ||= []);
-  if (!list.some((x) => within(folder, x.folder))) {
-    list.push({ folder, at: new Date().toISOString(), from: String(path).slice(0, 260) });
-    save(GRANTS, g);
-  }
+  remember(kind, folder, path);
 }
 
 // 직접 실행될 때 (PostToolUse 훅)

@@ -61,6 +61,25 @@ try {
   writeFileSync(stateFile, JSON.stringify({ workspacePaths: ['\\\\evil-server\\share', repo] }));
   const d1 = await (await fetch(`${base}/api/diff?conversationId=${conv}`)).json();
   check('변경 API: 기록된 폴더만 보이고 UNC 는 빠짐', d1.repos.length === 1 && d1.repos[0].git === true, JSON.stringify(d1).slice(0, 300));
+  // 색(테마) API: 앱 설정 파일은 가짜 홈(run-all)일 때만 만든다 — 진짜 ~/.gemini/config/config.json 은 건드리지 않는다
+  const fakeHome = homedir().toLowerCase().startsWith(tmpdir().toLowerCase());
+  if (fakeHome) {
+    mkdirSync(join(homedir(), '.gemini', 'config'), { recursive: true });
+    writeFileSync(join(homedir(), '.gemini', 'config', 'config.json'), JSON.stringify({ userSettings: { themeMode: 'THEME_MODE_DARK', customThemeSeedsDark: { background: '#1a1b26', foregroundOverride: '#A9B1D6', primary: 'red' } } }));
+  }
+  const th = await (await fetch(`${base}/api/theme`)).json();
+  check('테마 API: 기본은 앱 따라가기', th.prefs && th.prefs.theme === 'app' && Array.isArray(th.themes), JSON.stringify(th));
+  if (fakeHome) check('테마 API: 앱 색을 읽고 이상한 값(red)은 버림', th.app.mode === 'dark' && th.app.dark.bg === '#1A1B26' && th.app.dark.accent === null, JSON.stringify(th.app));
+  const badTheme = await (await fetch(`${base}/api/ui-prefs`, { method: 'POST', headers: H, body: JSON.stringify({ theme: '../x' }) })).json();
+  const badHex = await (await fetch(`${base}/api/ui-prefs`, { method: 'POST', headers: H, body: JSON.stringify({ theme: 'nord', accent: 'url(x)' }) })).json();
+  check('색 저장 API: 모르는 테마·#RRGGBB 아닌 색은 거부', !!badTheme.error && !!badHex.error, JSON.stringify([badTheme, badHex]));
+  if (fakeHome) {
+    const okPref = await (await fetch(`${base}/api/ui-prefs`, { method: 'POST', headers: H, body: JSON.stringify({ theme: 'nord', accent: '#ff8800' }) })).json();
+    const th2 = await (await fetch(`${base}/api/theme`)).json();
+    check('색 저장 API: 저장하면 다음 읽기에 그대로', okPref.ok && th2.prefs.theme === 'nord' && th2.prefs.accent === '#FF8800', JSON.stringify([okPref, th2.prefs]));
+  }
+  const noTokPref = await fetch(`${base}/api/ui-prefs`, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ theme: 'app' }) });
+  check('색 저장 API: 토큰 없으면 거부', noTokPref.status === 401, String(noTokPref.status));
   const pr = await (await fetch(`${base}/api/preset`, { method: 'POST', headers: H, body: JSON.stringify({ name: 'nope' }) })).json();
   check('모드 API: 모르는 이름은 거부', !!pr.error, JSON.stringify(pr));
   const emptyId = await fetch(`${base}/api/rewind`, { method: 'POST', headers: H, body: JSON.stringify({ conversationId: conv, id: '' }) });

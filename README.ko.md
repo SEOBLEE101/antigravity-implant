@@ -23,6 +23,8 @@
 | 위험한 명령을 그냥 돌린다 | 드라이브 통째 삭제·포맷 등은 항상 차단, 강제 푸시 등은 사용자가 말했을 때만 |
 | 문법 오류를 모르고 지나간다 | `.js/.json/.py` 를 고친 직후 문법 검사 → 오류면 바로 알림 |
 | 폴더 밖 파일마다 권한을 묻는다 | 한 번 허락한 파일의 폴더를 기억해 다음부터 묻지 않음 |
+| 오토 모드인데 명령마다 묻는다 | 샌드박스 밖 실행을 한 번 허락해 성공하면, 그 명령이 다룬 폴더를 샌드박스가 쓸 수 있게 기억 → 다음부터 그 폴더 작업은 묻지 않음 |
+| 패널 색이 앱과 따로 논다 | 패널이 앱 테마(설정 → Appearance)를 실시간으로 따라감. 패널 테마 9개 + 강조색 직접 고르기 |
 
 ## 들어 있는 것
 
@@ -30,7 +32,7 @@
 |---|---|
 | **훅** | 진행 보고 · 작업 중 메시지 우선 · 도중에 고친 규칙 즉시 반영 · 반복/막힘 감지 · 컨텍스트 경고 · 마무리 점검 · 조기 종료 감지 · 위험 명령 차단 · 고친 파일 문법 검사 · 폴더 단위 권한 기억 · 자동 체크포인트 |
 | **스킬 13개** | `/plan-first` `/code-review` `/rewind` `/remember` `/init-project` `/handoff` `/commit` `/pr` `/worktree` `/doctor` `/status-report` `/computer-use` `evidence-checkpoint` |
-| **Live Cockpit 패널** | 진행 · 계획(task.md) · 스크린샷 · git 변경 · 되돌리기 · 실시간 규칙 · 훅 기록 · 토큰 · 모드 · 메시지 보내기 · ⏸ 일시정지 |
+| **Live Cockpit 패널** | 진행 · 계획(task.md) · 스크린샷 · git 변경 · 되돌리기 · 실시간 규칙 · 훅 기록 · 토큰 · 모드 · 색 · 메시지 보내기 · ⏸ 일시정지 |
 | **CLI** | 상태줄, 되돌리기, 진단 |
 
 자세한 설명(설정, 체크포인트, 위험 명령 차단 규칙, 한계): [antigravity-implant/README.md](antigravity-implant/README.md)
@@ -61,6 +63,19 @@ powershell -ExecutionPolicy Bypass -File .\install-computer-use.ps1
 
 실행 전에 확인을 묻고, `mcp_config.json` 을 백업한 뒤 서버 하나만 추가합니다(키로거·얼굴인식·궤적 기록·클립보드 읽기 끔). 필요: git, [uv](https://docs.astral.sh/uv/).
 
+## 오토 모드에서 덜 묻게 하기
+
+왜 묻나: 명령은 터미널 샌드박스 안에서 돌고, 샌드박스는 작업 폴더와 허락한 폴더에만 쓸 수 있습니다. 그 밖이 필요하면 에이전트가 "샌드박스 밖 실행(`BypassSandbox`)"을 요청하고, 앱은 그 허락을 **명령 전체가 똑같을 때만** 맞는 규칙으로 저장해서 다음엔 다시 묻습니다.
+
+플러그인이 하는 일: 샌드박스 밖 실행을 허락해 성공하면, 그 명령이 다룬 폴더(작업 위치 `Cwd` 와 명령에 나온 실제 경로)에 `write_file(<폴더>\)` 규칙을 넣습니다. 샌드박스는 이 규칙을 따라 쓰기를 허용하므로, 다음부터 그 폴더 작업은 샌드박스 안에서 묻지 않고 돕니다. 드라이브 맨 위, 홈과 그 바로 아래 폴더, `AppData`, 점(.) 폴더, 시스템 폴더, 실행한 프로그램이 있는 폴더는 넓히지 않습니다. 끄려면 `~/.gemini/antigravity-implant/config.json` 에 `"folderGrantsFromCommands": false`.
+
+못 고치는 것: 샌드박스 안에 아예 없는 도구(예: 브라우저 CLI)는 매번 샌드박스 밖 실행이 필요합니다. 전혀 안 묻게 하려면 앱의 **설정 → General → Permissions → This Computer → Turbo**("모든 명령을 제한 없이 실행")를 직접 고르세요. 보안을 맞바꾸는 선택이라 플러그인이 대신 바꾸지 않습니다.
+
+## 색 바꾸기
+
+- **Antigravity 앱 자체:** **설정 → Appearance** 에 프리셋 11개(Catppuccin, Dracula, Tokyo Night, Gruvbox Material, One Dark Pro, Solarized Dark …)와 어두운/밝은 테마별 Background·Foreground·Accent, 대비(Contrast), 글꼴, 글자 크기가 있습니다. 값은 `~/.gemini/config/config.json` 의 `userSettings.customThemeSeedsDark/Light` 에 저장됩니다. 앱이 켜져 있으면 파일을 바깥에서 고쳐도 반영되지 않으니 앱 설정 화면에서 바꾸세요.
+- **Live Cockpit 패널:** 위쪽 **색** 메뉴. 기본 *앱 따라가기*는 몇 초마다 앱 색을 다시 읽어 맞춥니다. 또는 Catppuccin · Dracula · Tokyo Night · Gruvbox · Nord · Solarized Dark · One Dark · GitHub Light · Paper 중 고르고, 옆 색 칸으로 강조색만 따로 바꿀 수 있습니다. 패널 테마를 고르면 앱 설정 → Appearance 에 넣을 세 값(누르면 복사)이 함께 나와 앱도 똑같이 맞출 수 있습니다.
+
 ## 안전
 
 - 위험 명령 차단 훅은 `run_command` 에만 걸리고 `allow` 를 절대 내지 않습니다(사용자 권한 설정 그대로). `cmd /c "…"`·`powershell -c "…"`·`-EncodedCommand` 안에 숨긴 명령도 풀어서 봅니다.
@@ -75,7 +90,7 @@ powershell -ExecutionPolicy Bypass -File .\install-computer-use.ps1
 node tests/run-all.mjs
 ```
 
-시험 162개. 임시 폴더를 가짜 사용자 폴더로 써서 실제 설정(`~/.gemini`)을 건드리지 않습니다. `cockpit-rewind-test` 는 앱이 깔아 둔 `sidecar_sdk` 가 있어야 하고, 없으면 건너뜁니다.
+시험 174개. 임시 폴더를 가짜 사용자 폴더로 써서 실제 설정(`~/.gemini`)을 건드리지 않습니다. `cockpit-rewind-test` 는 앱이 깔아 둔 `sidecar_sdk` 가 있어야 하고, 없으면 건너뜁니다.
 
 ## 왜 이렇게 만들었나 (실험으로 확인한 것)
 

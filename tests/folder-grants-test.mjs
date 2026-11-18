@@ -35,6 +35,29 @@ for (const [label, p] of [['드라이브 맨 위', 'E:\\a.txt'], ['홈 맨 위',
   const before = allow().length; post('read_file', p);
   check(`${label}: 폴더로 넓히지 않음`, allow().length === before, JSON.stringify(allow().slice(before)));
 }
+// 샌드박스 밖 실행(BypassSandbox)을 허락받아 성공한 명령 → 명령에 나온 (실제로 있는) 폴더에 쓰기 허락
+const postCmd = (args, error = '') => spawnSync(process.execPath, [join(hooks, 'folder_grants.mjs')], { input: JSON.stringify({ toolCall: { name: 'run_command', id: 'x', args }, workspacePaths: ['C:/work/proj'], error }), encoding: 'utf8', env });
+const bp = mkdtempSync(join(tmpdir(), 'agyc-bp-'));
+const dst = join(bp, 'out'); const tools = join(bp, 'tools'); const plain = join(bp, 'plain');
+for (const d of [dst, tools, plain]) mkdirSync(d);
+writeFileSync(join(tools, 'tool.exe'), '');
+const wr = (d) => `write_file(${d}\\)`;
+// 앱이 주는 모양 그대로: 값이 JSON 문자열로 한 번 더 감싸져 있음
+postCmd({ BypassSandbox: '"true"', CommandLine: JSON.stringify(`git -C "${dst}" commit -qm x`) });
+check('우회 실행 성공 → 명령에 나온 폴더 쓰기 규칙 추가', allow().includes(wr(dst)), JSON.stringify(allow().slice(-3)));
+postCmd({ CommandLine: JSON.stringify(`Remove-Item "${plain}\\a.txt"`) });
+check('샌드박스 안 실행(BypassSandbox 없음)은 넣지 않음', !allow().includes(wr(plain)), JSON.stringify(allow().slice(-3)));
+postCmd({ BypassSandbox: true, CommandLine: `Remove-Item "${plain}"` }, 'exit status 1');
+check('실패한 우회 실행은 넣지 않음', !allow().includes(wr(plain)), JSON.stringify(allow().slice(-3)));
+postCmd({ BypassSandbox: 'true', CommandLine: `"${join(tools, 'tool.exe')}" --version; dir ${join(bp, 'nope')}` });
+check('실행한 프로그램 폴더·없는 경로는 넣지 않음', !allow().includes(wr(tools)) && !allow().some((a) => a.includes('nope')), JSON.stringify(allow().slice(-3)));
+postCmd({ BypassSandbox: 'true', CommandLine: 'Get-Content C:\\Windows\\System32\\drivers\\etc\\hosts; Get-ChildItem ' + H + '\\.ssh' });
+check('시스템·숨김 폴더는 넓히지 않음', !allow().some((a) => /Windows|\.ssh/.test(a)), JSON.stringify(allow().slice(-3)));
+postCmd({ BypassSandbox: 'true', Cwd: plain, CommandLine: 'git commit -qm x' });
+check('작업 위치(Cwd)도 대상', allow().includes(wr(plain)), JSON.stringify(allow().slice(-3)));
+check('명령에서 기억한 폴더도 기억 목록에 남음', JSON.parse(readFileSync(join(home, '.gemini', 'antigravity-implant', 'folder-grants.json'), 'utf8')).write.some((x) => x.folder === dst && /BypassSandbox/.test(x.from)), '');
+rmSync(bp, { recursive: true, force: true, maxRetries: 3 });
+
 const c = JSON.parse(readFileSync(cfgFile, 'utf8'));
 check('다른 설정은 그대로', c.plugins.x === 1 && c.userSettings.autoExecutionPolicy === 'A' && c.userSettings.globalPermissionGrants.allow[0] === 'command(git)', JSON.stringify(c).slice(0, 200));
 

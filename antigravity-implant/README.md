@@ -95,9 +95,13 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1 -StatusLine
   "dangerGuard": true,
   "syntaxCheck": true,
   "folderGrants": true,
+  "folderGrantsFromCommands": true,
   "checkpoints": true
 }
 ```
+
+- `folderGrantsFromCommands`: 샌드박스 밖 실행(`BypassSandbox`)을 사용자가 허락해 성공한 `run_command` 에서, 그 명령의 작업 위치(`Cwd`)와 명령에 나온 실제 경로(최대 3개)의 폴더에 `write_file(<폴더>\)` 를 넣습니다. 터미널 샌드박스의 쓰기 범위가 이 규칙을 따르므로(agy CLI 로 확인), 다음부터 그 폴더 작업은 샌드박스 안에서 묻지 않고 됩니다. 폴더 허락과 같은 제외 규칙(드라이브 맨 위·홈·홈 바로 아래·AppData·점 폴더·시스템 폴더)에 더해, 실행 파일·스크립트(`.exe` `.ps1` `.py` 등)가 있는 폴더와 와일드카드 경로는 넓히지 않습니다. 샌드박스 밖 실행 자체를 자동 허락하는 규칙은 없습니다(`unsandboxed(…)` 규칙도 agy CLI 에서 듣지 않음).
+- 패널 색은 `~/.gemini/antigravity-implant/ui.json`(`theme`, `accent`)에 저장됩니다. `app` 이면 앱의 `config.json` → `userSettings.themeMode`·`customThemeSeedsDark/Light` 를 읽기만 합니다.
 
 - `remindMode`: `always` 매 호출 / `smart` 새 메시지이거나 말없는 호출이 이어질 때만 / `off`
 - `verifyCommand`: 파일을 고친 턴 끝에 마무리 점검이 "한 번 실행하라"고 권할 **내 검증 명령**(예: `npm test`). 작업 폴더의 `.agents/verify-command` 첫 줄은 저장소가 넣은 파일이라 믿지 않고 "후보"로만 보여줍니다 — 에이전트가 평범한 테스트 명령인지 보고, 아니면 사용자에게 묻습니다. 백틱·줄바꿈·`; & | < >` 가 든 명령은 어느 쪽이든 쓰지 않습니다.

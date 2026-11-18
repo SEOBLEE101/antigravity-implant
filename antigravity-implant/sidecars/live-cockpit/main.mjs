@@ -373,6 +373,51 @@ app.api('/api/preset', (body) => {
   return { ok: true, preset: p.preset };
 }, 'POST');
 
+// 패널 색: 기본은 "앱 따라가기". 앱은 테마를 ~/.gemini/config/config.json 의 userSettings 에 저장한다
+// (themeMode, customThemeSeedsDark/Light = { background, foregroundOverride, primary }). 여기서는 읽기만 한다 —
+// 앱이 켜져 있는 동안 바깥에서 고치면 반영되지 않고 앱이 덮어쓰므로, 앱 색은 앱 설정 화면에서만 바꾼다.
+const APP_CONFIG = join(HOME, '.gemini', 'config', 'config.json');
+const UI_PREFS = join(DATA_DIR, 'ui.json');
+const PANEL_THEMES = ['app', 'catppuccin', 'dracula', 'tokyo-night', 'gruvbox', 'nord', 'solarized-dark', 'one-dark', 'github-light', 'paper'];
+const HEX_RE = /^#[0-9a-f]{6}$/i;
+const hexOrNull = (v) => (typeof v === 'string' && HEX_RE.test(v) ? v.toUpperCase() : null);
+function seedsOf(o) {
+  if (!o || typeof o !== 'object') return null;
+  const s = { bg: hexOrNull(o.background), fg: hexOrNull(o.foregroundOverride || o.foreground), accent: hexOrNull(o.primary) };
+  return s.bg || s.fg || s.accent ? s : null;
+}
+let appThemeCache = { stamp: -1, value: null };
+function appTheme() {
+  const st = fileStamp(APP_CONFIG);
+  if (st === appThemeCache.stamp) return appThemeCache.value;
+  let us = {};
+  try { us = (JSON.parse(readFileSync(APP_CONFIG, 'utf8').replace(/^﻿/, '')) || {}).userSettings || {}; } catch {}
+  const m = String(us.themeMode || '');
+  const value = {
+    mode: m.includes('LIGHT') ? 'light' : m.includes('INHERIT') ? 'system' : 'dark', // 앱도 값이 없으면 어둡게 시작한다
+    dark: seedsOf(us.customThemeSeedsDark),
+    light: seedsOf(us.customThemeSeedsLight),
+    strongContrast: us.highContrastTextEnabled === true,
+  };
+  appThemeCache = { stamp: st, value };
+  return value;
+}
+function readPrefs() {
+  try {
+    const p = JSON.parse(readFileSync(UI_PREFS, 'utf8'));
+    return { theme: PANEL_THEMES.includes(p.theme) ? p.theme : 'app', accent: hexOrNull(p.accent) };
+  } catch { return { theme: 'app', accent: null }; }
+}
+app.api('/api/theme', () => ({ app: appTheme(), prefs: readPrefs(), themes: PANEL_THEMES }), 'GET');
+app.api('/api/ui-prefs', (body) => {
+  const theme = String((body && body.theme) || 'app');
+  const accent = body && body.accent ? hexOrNull(body.accent) : null;
+  if (!PANEL_THEMES.includes(theme)) return jsonError('unknown theme');
+  if (body && body.accent && !accent) return jsonError('색은 #RRGGBB 형식이어야 합니다.');
+  try { atomicWrite(UI_PREFS, JSON.stringify({ theme, accent }, null, 1)); } catch (e) { return jsonError('저장 실패: ' + e.code, 500); }
+  return { ok: true, prefs: { theme, accent } };
+}, 'POST');
+
 // 변경 보기: 이 대화의 작업 폴더(훅이 기록한 것)만, 읽기 전용 git 명령만, 외부 프로그램 실행은 끈 채로.
 function git(cwd, args, max = 400 * 1024) {
   return new Promise((resolveP) => {

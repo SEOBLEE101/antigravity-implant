@@ -25,6 +25,8 @@
 | Runs dangerous commands | Wiping a drive, formatting, etc. are always blocked; force-push, `reset --hard`, registry edits only pass when you asked for them |
 | Misses syntax errors | `.js/.json/.py` files are syntax-checked right after an edit; errors are reported on the next call |
 | Asks permission for every file outside the workspace | Once you allow a file, its folder is remembered so you are not asked again |
+| Auto mode still asks before many commands | When you approve a command that had to run outside the terminal sandbox, the folders it worked in become writable for the sandbox, so the next commands there run without asking |
+| Panel looks out of place | The panel follows the app's theme (Settings → Appearance) live, or pick one of 9 panel themes and your own accent color |
 
 ## What's inside
 
@@ -32,7 +34,7 @@
 |---|---|
 | **Hooks** | progress reporting · mid-task messages first · live rule reload · loop / stuck detection · context warnings · wrap-up check · early-stop detection · dangerous-command guard · post-edit syntax check · folder-level permission memory · automatic checkpoints |
 | **13 skills** | `/plan-first` `/code-review` `/rewind` `/remember` `/init-project` `/handoff` `/commit` `/pr` `/worktree` `/doctor` `/status-report` `/computer-use` `evidence-checkpoint` |
-| **Live Cockpit panel** | progress · plan (task.md) · screenshots · git diff · rewind · live rules · hook log · tokens · mode · send message · ⏸ pause |
+| **Live Cockpit panel** | progress · plan (task.md) · screenshots · git diff · rewind · live rules · hook log · tokens · mode · colors · send message · ⏸ pause |
 | **CLI** | status line, rewind, doctor |
 
 Full reference (settings, checkpoints, guard rules, limits) — Korean: [antigravity-implant/README.md](antigravity-implant/README.md)
@@ -63,6 +65,19 @@ powershell -ExecutionPolicy Bypass -File .\install-computer-use.ps1
 
 It asks for confirmation, backs up `mcp_config.json`, and registers one server with keylogging, face detection, trajectory logging and clipboard reading turned off. Requires git and [uv](https://docs.astral.sh/uv/).
 
+## Fewer permission prompts in Auto mode
+
+Why Auto mode still asks: commands run inside a terminal sandbox that can only write to the workspace and to folders you allowed. When a command needs more, the agent asks to run it outside the sandbox (`BypassSandbox`), and the app saves your approval as an exact full-command rule that never matches again.
+
+What the plugin does: after you approve such a command and it succeeds, it adds `write_file(<folder>\)` for the folders the command worked in (its `Cwd` and existing paths in the command line). The sandbox then allows writes there, so the agent no longer needs to leave the sandbox for that folder. Drive roots, your home folder and the folders directly under it, `AppData`, dot-folders, system folders and the folders of executables you ran are never widened. Turn it off with `"folderGrantsFromCommands": false` in `~/.gemini/antigravity-implant/config.json`.
+
+What it cannot fix: tools that do not exist inside the sandbox (for example a browser CLI) always need the bypass. If you want no prompts at all, that is the app's choice to make in **Settings → General → Permissions → This Computer → Turbo** ("Run all commands without restrictions") — a real security trade-off, so the plugin never changes it for you.
+
+## Colors
+
+- **Antigravity itself:** **Settings → Appearance** has 11 presets (Catppuccin, Dracula, Tokyo Night, Gruvbox Material, One Dark Pro, Solarized Dark, …) plus your own Background / Foreground / Accent for the dark and light themes, Contrast, Font and Font Size. The app stores them in `~/.gemini/config/config.json` (`userSettings.customThemeSeedsDark/Light`); edit them in the app, not in the file — the running app does not pick up outside edits.
+- **Live Cockpit panel:** the **색 (color)** menu at the top. *Follow app* (default) re-reads the app's colors every few seconds; or choose Catppuccin, Dracula, Tokyo Night, Gruvbox, Nord, Solarized Dark, One Dark, GitHub Light or Paper, and override just the accent with the color swatch. When a panel theme is selected, the panel shows the three hex values to paste into Settings → Appearance (click to copy) so the app can match it.
+
 ## Safety
 
 - The dangerous-command guard only hooks `run_command` and never returns `allow` (your permission settings stay in charge). It also unpacks commands hidden inside `cmd /c "…"`, `powershell -c "…"` and `-EncodedCommand`.
@@ -77,7 +92,7 @@ It asks for confirmation, backs up `mcp_config.json`, and registers one server w
 node tests/run-all.mjs
 ```
 
-162 checks. Each run uses a temporary fake home folder, so your real `~/.gemini` is never touched. `cockpit-rewind-test` needs the `sidecar_sdk` that the Antigravity app installs and is skipped otherwise.
+174 checks. Each run uses a temporary fake home folder, so your real `~/.gemini` is never touched. `cockpit-rewind-test` needs the `sidecar_sdk` that the Antigravity app installs and is skipped otherwise.
 
 ## Why it is built this way (verified by experiment)
 
