@@ -67,7 +67,7 @@ powershell -ExecutionPolicy Bypass -File .\install-computer-use.ps1
 
 왜 묻나: 명령은 터미널 샌드박스 안에서 돌고, 샌드박스는 작업 폴더와 허락한 폴더에만 쓸 수 있습니다. 그 밖이 필요하면 에이전트가 "샌드박스 밖 실행(`BypassSandbox`)"을 요청하고, 앱은 그 허락을 **명령 전체가 똑같을 때만** 맞는 규칙으로 저장해서 다음엔 다시 묻습니다.
 
-플러그인이 할 수 있는 일(직접 켜야 함): `~/.gemini/antigravity-implant/config.json` 에 `"folderGrantsFromCommands": true` 를 넣으면, 샌드박스 밖 실행을 허락해 성공했을 때 명령에 나온 실제 폴더(최대 3개)에 `write_file(<폴더>\)` 규칙을 넣습니다. 샌드박스는 이 규칙을 따라 쓰기를 허용하므로, 다음부터 그 폴더 작업은 샌드박스 안에서 묻지 않고 돕니다. 명령 글자만으로는 정말 어디에 썼는지 알 수 없어서 기본은 꺼 두었습니다. 경로는 먼저 진짜 위치로 바꿔 판단하고(정션·바로가기·짧은 이름 풀기), 드라이브 맨 위, 홈과 그 바로 아래 폴더, `AppData`, 점(.) 폴더, 시스템 폴더, 실행한 프로그램이 있는 폴더, 이상한 표기(끝의 점·공백, `~1` 짧은 이름, `:` 스트림, `\\?\`)는 넓히지 않습니다. 넣은 폴더는 `~/.gemini/antigravity-implant/folder-grants.json` 에 남습니다.
+플러그인이 할 수 있는 일(직접 켜야 함): `~/.gemini/antigravity-implant/config.json` 에 `"folderGrantsFromCommands": true` 를 넣으면, 샌드박스 밖 실행을 허락해 성공했을 때 명령에 나온 실제 폴더(최대 3개)에 `write_file(<폴더>\)` 규칙을 넣습니다. 샌드박스는 이 규칙을 따라 쓰기를 허용하므로, 다음부터 그 폴더 작업은 샌드박스 안에서 묻지 않고 돕니다. 명령 글자만으로는 정말 어디에 썼는지 알 수 없어서 기본은 꺼 두었습니다. 정션·바로가기·짧은 이름을 거쳐 실제 위치가 다른 경로는 넓히지 않고, 드라이브 맨 위, 홈과 그 바로 아래 폴더, `AppData`, 점(.) 폴더, 시스템 폴더, 실행한 프로그램이 있는 폴더, 이상한 표기(끝의 점·공백, `~1` 짧은 이름, `:` 스트림, `\\?\`)는 넓히지 않습니다. 넣은 폴더는 `~/.gemini/antigravity-implant/folder-grants.json` 에 남습니다.
 
 못 고치는 것: 샌드박스 안에 아예 없는 도구(예: 브라우저 CLI)는 매번 샌드박스 밖 실행이 필요합니다. 전혀 안 묻게 하려면 앱의 **설정 → General → Permissions → This Computer → Turbo**("모든 명령을 제한 없이 실행")를 직접 고르세요. 보안을 맞바꾸는 선택이라 플러그인이 대신 바꾸지 않습니다.
 
@@ -90,7 +90,7 @@ powershell -ExecutionPolicy Bypass -File .\install-computer-use.ps1
 node tests/run-all.mjs
 ```
 
-시험 185개. 임시 폴더를 가짜 사용자 폴더로 써서 실제 설정(`~/.gemini`)을 건드리지 않습니다. `cockpit-rewind-test` 는 앱이 깔아 둔 `sidecar_sdk` 가 있어야 하고, 없으면 건너뜁니다.
+시험 186개. 임시 폴더를 가짜 사용자 폴더로 써서 실제 설정(`~/.gemini`)을 건드리지 않습니다. `cockpit-rewind-test` 는 앱이 깔아 둔 `sidecar_sdk` 가 있어야 하고, 없으면 건너뜁니다.
 
 ## 왜 이렇게 만들었나 (실험으로 확인한 것)
 

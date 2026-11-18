@@ -69,7 +69,7 @@ It asks for confirmation, backs up `mcp_config.json`, and registers one server w
 
 Why Auto mode still asks: commands run inside a terminal sandbox that can only write to the workspace and to folders you allowed. When a command needs more, the agent asks to run it outside the sandbox (`BypassSandbox`), and the app saves your approval as an exact full-command rule that never matches again.
 
-What the plugin can do (opt-in): with `"folderGrantsFromCommands": true` in `~/.gemini/antigravity-implant/config.json`, after you approve such a command and it succeeds, it adds `write_file(<folder>\)` for the existing folders named in the command line (at most 3). The sandbox then allows writes there, so the agent no longer needs to leave the sandbox for that folder. It is off by default because the command text alone cannot prove where the command really wrote. Paths are resolved to their real location first (junctions, symlinks, 8.3 short names), and drive roots, your home folder and the folders directly under it, `AppData`, dot-folders, system folders, folders of executables you ran, and odd spellings (trailing dots/spaces, `~1` short names, `:` streams, `\\?\`) are never widened. Granted folders are listed in `~/.gemini/antigravity-implant/folder-grants.json`.
+What the plugin can do (opt-in): with `"folderGrantsFromCommands": true` in `~/.gemini/antigravity-implant/config.json`, after you approve such a command and it succeeds, it adds `write_file(<folder>\)` for the existing folders named in the command line (at most 3). The sandbox then allows writes there, so the agent no longer needs to leave the sandbox for that folder. It is off by default because the command text alone cannot prove where the command really wrote. Folders reached through a junction, symlink or 8.3 short name are never widened, and drive roots, your home folder and the folders directly under it, `AppData`, dot-folders, system folders, folders of executables you ran, and odd spellings (trailing dots/spaces, `~1` short names, `:` streams, `\\?\`) are never widened. Granted folders are listed in `~/.gemini/antigravity-implant/folder-grants.json`.
 
 What it cannot fix: tools that do not exist inside the sandbox (for example a browser CLI) always need the bypass. If you want no prompts at all, that is the app's choice to make in **Settings → General → Permissions → This Computer → Turbo** ("Run all commands without restrictions") — a real security trade-off, so the plugin never changes it for you.
 
@@ -92,7 +92,7 @@ What it cannot fix: tools that do not exist inside the sandbox (for example a br
 node tests/run-all.mjs
 ```
 
-185 checks. Each run uses a temporary fake home folder, so your real `~/.gemini` is never touched. `cockpit-rewind-test` needs the `sidecar_sdk` that the Antigravity app installs and is skipped otherwise.
+186 checks. Each run uses a temporary fake home folder, so your real `~/.gemini` is never touched. `cockpit-rewind-test` needs the `sidecar_sdk` that the Antigravity app installs and is skipped otherwise.
 
 ## Why it is built this way (verified by experiment)
 

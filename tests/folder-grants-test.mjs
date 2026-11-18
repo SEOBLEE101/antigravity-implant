@@ -40,6 +40,14 @@ if (jnOk) {
   const before = allow().length; post('write_file', join(jn, 'evil.txt'));
   check('정션으로 AppData 를 가리켜도 넓히지 않음', allow().length === before, JSON.stringify(allow().slice(before)));
 }
+// 정션이 평범한 폴더를 가리켜도: 사용자가 본 경로와 실제 위치가 다르면 어느 쪽에도 규칙을 쓰지 않음
+const plainTarget = join(ext, 'RealPlace'); mkdirSync(plainTarget); writeFileSync(join(plainTarget, 'a.txt'), 'x');
+const jn2 = join(ext, 'Alias');
+let jn2Ok = false; try { symlinkSync(plainTarget, jn2, 'junction'); jn2Ok = true; } catch {}
+if (jn2Ok) {
+  const before = allow().length; post('read_file', join(jn2, 'a.txt'));
+  check('정션 경로는 실제 위치와 달라 넓히지 않음', allow().length === before && !allow().some((a) => /RealPlace|Alias/.test(a)), JSON.stringify(allow().slice(before)));
+}
 post('read_file', join(ext, 'Denied', 'a.txt'), 'permission denied');
 check('거부(오류)된 건 넣지 않음', !allow().some((a) => a.includes('Denied')), JSON.stringify(allow()));
 post('read_file', 'C:\\work\\proj\\src\\a.js');
@@ -97,6 +105,7 @@ check('빠진 규칙을 요청 시작 때 다시 채움', allow().includes(`read
 check('기억 목록 파일', JSON.parse(readFileSync(join(home, '.gemini', 'antigravity-implant', 'folder-grants.json'), 'utf8')).read.length === 1, '');
 
 if (jnOk) { try { rmdirSync(jn); } catch {} } // 정션 자체만 먼저 지운다
+if (jn2Ok) { try { rmdirSync(jn2); } catch {} }
 rmSync(ext, { recursive: true, force: true, maxRetries: 3 });
 rmSync(home, { recursive: true, force: true });
 console.log(fails ? `\n${fails}개 실패` : '\n전부 통과');

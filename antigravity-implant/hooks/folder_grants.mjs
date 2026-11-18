@@ -49,6 +49,19 @@ export function folderFor(path) {
   return dirOrig;
 }
 
+// 경로가 가리키는 실제 위치(realpath)가 적힌 경로와 같은가 (대소문자 무시). 파일이 아직 없으면(새로 쓸 파일) 그 폴더로 본다.
+// 경로의 어느 단계든 정션·심볼릭 링크·짧은 이름이면 실제 위치가 달라지므로 false. 확인을 못 하면 false.
+export function samePlace(path) {
+  if (!/^[a-z]:[\\/]/i.test(String(path || ''))) return false;
+  const want = win32.resolve(String(path));
+  let target = want, real;
+  try { real = realpathSync.native(target); } catch {
+    target = win32.dirname(want);
+    try { real = realpathSync.native(target); } catch { return false; }
+  }
+  return norm(real) === norm(target);
+}
+
 function load(f, d) { try { return JSON.parse(readFileSync(f, 'utf8').replace(/^\uFEFF/, '')); } catch { return d; } }
 function save(f, v) { atomicWrite(f, JSON.stringify(v, null, 1)); }
 
@@ -110,13 +123,9 @@ export function bypassFolders(args) {
     let p = (m[1] || m[2] || m[3] || '').replace(/[\\/]+$/, '');
     if (!p || /[*?]/.test(p)) continue; // 와일드카드는 판단하지 않는다
     if (EXEC_RE.test(p)) continue; // 실행한 프로그램(C:\ffmpeg\bin\ffmpeg.exe 등)의 폴더에는 쓰기를 넓히지 않는다
-    try {
-      // 진짜 경로로 바꾼 뒤 판단하고, 규칙도 그 진짜 경로로 쓴다 (짧은 이름·정션·심볼릭 링크로 제외 규칙을 비껴가지 않게)
-      const real = realpathSync.native(p);
-      if (!/^[a-z]:\\/i.test(real)) continue; // \\?\ · UNC 등은 넓히지 않는다
-      const st = statSync(real);
-      cands.push(st.isDirectory() ? win32.join(real, '_') : real); // 폴더 자체가 나오면 그 폴더, 파일이면 그 파일의 폴더
-    } catch {}
+    // 실제로 있고, 적힌 경로가 곧 실제 위치일 때만 (짧은 이름·정션·심볼릭 링크로 다른 곳을 가리키면 넓히지 않는다)
+    if (!samePlace(p)) continue;
+    try { cands.push(statSync(p).isDirectory() ? win32.join(p, '_') : p); } catch {} // 폴더 자체면 그 폴더, 파일이면 그 파일의 폴더
   }
   const out = [];
   for (const c of cands) {
@@ -157,14 +166,10 @@ export function onPostToolUse(input) {
   const path = argPath(call.args); // 상대 경로는 작업 폴더 안이라 대상이 아니다 → 절대 경로만
   if (!kind || !path || !/^[a-z]:[\\/]/i.test(path)) return;
   if (inWorkspace(path)) return; // 작업 폴더 안
-  // 정션·심볼릭 링크·짧은 이름을 풀어서 판단한다. 파일이 없으면 그 폴더의 진짜 경로 + 파일 이름. 폴더도 못 풀면 넓히지 않는다.
-  let real;
-  try { real = realpathSync.native(path); } catch {
-    try { real = win32.join(realpathSync.native(win32.dirname(path)), win32.basename(path)); } catch { return; }
-  }
-  if (!/^[a-z]:\\/i.test(real)) return;
-  if (real !== path && inWorkspace(real)) return;
-  const folder = folderFor(real);
+  // 사용자가 허락한 경로가 실제 위치와 같을 때만 넓힌다. 정션·심볼릭 링크·짧은 이름으로 다른 곳을 가리키면
+  // 사용자가 본 적 없는 실제 위치에 규칙을 쓰게 되므로 넓히지 않는다 (파일마다 계속 묻는다).
+  if (!samePlace(path)) return;
+  const folder = folderFor(path);
   if (!folder) return;
   remember(kind, folder, path);
 }
