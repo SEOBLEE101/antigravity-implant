@@ -6,7 +6,8 @@
 //  - 위험하면 {"decision":"deny","reason":"…"}
 //
 // 판정 방식: 명령을 ; && || & 줄바꿈으로 문장을 나누고, | 로 파이프 단계를 나눈 뒤 단계마다 본다.
-//  cmd /c "…", powershell -c "…", powershell -EncodedCommand <base64> 는 속 명령을 꺼내 다시 본다(최대 3겹).
+//  cmd /c "…", powershell -c "…", powershell -EncodedCommand <base64> 는 속 명령을 꺼내 다시 본다(최대 5겹, 더 깊으면 확인 요청).
+//  스크립트 블록 { … } · $( … ) 안도 끝까지 다시 본다.
 //  따옴표 안의 글(커밋 메시지·검색어)은 명령 이름으로 보지 않는다. 경로는 .. 를 정리하고 환경 변수 표기도 본다.
 // 두 등급:
 //  1) 항상 막음: 드라이브·사용자 폴더·시스템 폴더 통째 삭제(파이프·robocopy /MIR·.NET 포함), 디스크 포맷/초기화,
@@ -21,7 +22,7 @@ import { homedir } from 'node:os';
 
 const DATA_DIR = join(homedir(), '.gemini', 'antigravity-implant');
 const ID_RE = /^[0-9a-zA-Z-]{8,64}$/;
-const MAX_DEPTH = 3;
+const MAX_DEPTH = 5; // cmd /c · powershell -c 를 몇 겹까지 풀어 볼지. 넘으면 확인 요청 (못 본 채 통과시키지 않음)
 
 // ---------- 문자열 쪼개기 ----------
 // 따옴표 밖의 구분자로 문장(statement)과 파이프 단계(stage)를 나눈다. 반환: [[stage, stage…], …]
@@ -74,11 +75,11 @@ function blocksOf(stage) {
   return out.filter((b) => b.trim());
 }
 
-// cmd /c "…", powershell -c "…", -EncodedCommand, 스크립트 블록 → 속 명령
+// cmd /c "…", powershell -c "…", -EncodedCommand → 속 명령 (스크립트 블록은 blocksOf 로 따로 본다)
 function innerCommands(stage) {
   const toks = tokenize(stage);
   const v = verbOf(toks[0] === '&' ? toks[1] : toks[0]);
-  const res = [...blocksOf(stage)];
+  const res = [];
   if (v === 'cmd') {
     // cmd /c "…", cmd /c"…"(붙여 쓰기), cmd /s /c …
     const mm = stage.match(/\s\/[ck](?=[\s"])\s*([\s\S]*)$/i);
@@ -233,8 +234,18 @@ export function judge(cmd, userText, depth = 0) {
     }
     for (let i = 0; i < infos.length; i++) {
       const s = infos[i];
-      // 속 명령 먼저
-      if (depth < MAX_DEPTH) for (const inner of innerCommands(s.text)) {
+      // 속 명령 먼저.
+      //  - 스크립트 블록 { … } $( … ): 속은 항상 원래보다 짧아 끝이 있으므로 깊이 제한 없이 끝까지 본다
+      //  - cmd /c · powershell -c · 인코딩: MAX_DEPTH 겹까지 풀고, 그보다 깊으면 못 본 채 통과시키지 않고 확인 요청
+      for (const inner of blocksOf(s.text)) {
+        const r = judge(inner, u, depth);
+        if (r && r.level === 'always') return r;
+        if (r && !confirmHit) confirmHit = r;
+      }
+      const wrapped = innerCommands(s.text);
+      if (wrapped.length && depth >= MAX_DEPTH) {
+        confirmHit = confirmHit || { level: 'confirm', what: `너무 여러 겹(${MAX_DEPTH}겹 넘게) 감싼 명령` };
+      } else for (const inner of wrapped) {
         const r = judge(inner, u, depth + 1);
         if (r && r.level === 'always') return r;
         if (r && !confirmHit) confirmHit = r;
