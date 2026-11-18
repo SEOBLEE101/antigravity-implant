@@ -198,13 +198,21 @@ function stageInfo(stage) {
     if (next === stage) break;
     stage = next;
   }
-  const cnt = (ch) => (blankQuotes(stage).split(ch).length - 1);
-  while (/[})]\s*$/.test(stage)) {
-    const last = stage.trimEnd().slice(-1), open = last === '}' ? '{' : '(';
-    if (cnt(last) <= cnt(open)) break;
-    stage = stage.trimEnd().slice(0, -1);
+  // 짝 맞추기는 한 번만 센다 (괄호 하나마다 다시 세면 아주 긴 명령에서 느려진다)
+  {
+    const b = blankQuotes(stage);
+    let extraCurly = (b.split('}').length - 1) - (b.split('{').length - 1);
+    let extraParen = (b.split(')').length - 1) - (b.split('(').length - 1);
+    let end = stage.length;
+    while (end > 0) {
+      const ch = stage[end - 1];
+      if (/\s/.test(ch)) { end--; continue; }
+      if (ch === '}' && extraCurly > 0) { extraCurly--; end--; continue; }
+      if (ch === ')' && extraParen > 0) { extraParen--; end--; continue; }
+      break;
+    }
+    stage = stage.slice(0, end).trim();
   }
-  stage = stage.trim();
   const toks = tokenize(stage);
   const head = toks[0] === '&' ? toks.slice(1) : toks;
   const bare = blankQuotes(stage);
@@ -220,9 +228,12 @@ const DOWNLOAD_RE =/^(iwr|irm|invoke-webrequest|invoke-restmethod|curl|wget|star
 const RUNNER_RE = /^(iex|invoke-expression|sh|bash|zsh|python[0-9.]*|py|node|pwsh|powershell|cmd)$/;
 
 // 결과: null 또는 { level: 'always'|'confirm', what }
-export function judge(cmd, userText, depth = 0) {
+const MAX_BLOCK_DEPTH = 64; // { … } $( … ) 를 몇 겹까지 따라갈지. 넘으면 확인 요청 (스택 넘침으로 판정이 죽지 않게)
+export function judge(cmd, userText, depth = 0, blockDepth = 0) {
   const c = String(cmd || '');
   if (!c.trim()) return null;
+  // 평범한 명령은 이렇게 길지 않다. 지나치게 긴 명령은 끝까지 따져 보는 대신 확인 요청 (판정이 느려져 훅이 시간 초과되지 않게)
+  if (depth === 0 && blockDepth === 0 && c.length > 100000) return { level: 'confirm', what: '지나치게 긴 명령(10만 자 초과)' };
   if (c.includes('\u0000ENCODED')) return CONFIRM_ENCODED(userText);
   const u = String(userText || '');
   const downloaded = new Set();
@@ -237,8 +248,11 @@ export function judge(cmd, userText, depth = 0) {
       // 속 명령 먼저.
       //  - 스크립트 블록 { … } $( … ): 속은 항상 원래보다 짧아 끝이 있으므로 깊이 제한 없이 끝까지 본다
       //  - cmd /c · powershell -c · 인코딩: MAX_DEPTH 겹까지 풀고, 그보다 깊으면 못 본 채 통과시키지 않고 확인 요청
-      for (const inner of blocksOf(s.text)) {
-        const r = judge(inner, u, depth);
+      const blocks = blocksOf(s.text);
+      if (blocks.length && blockDepth >= MAX_BLOCK_DEPTH) {
+        confirmHit = confirmHit || { level: 'confirm', what: `너무 여러 겹(${MAX_BLOCK_DEPTH}겹 넘게) 감싼 스크립트 블록` };
+      } else for (const inner of blocks) {
+        const r = judge(inner, u, depth, blockDepth + 1);
         if (r && r.level === 'always') return r;
         if (r && !confirmHit) confirmHit = r;
       }
@@ -246,7 +260,7 @@ export function judge(cmd, userText, depth = 0) {
       if (wrapped.length && depth >= MAX_DEPTH) {
         confirmHit = confirmHit || { level: 'confirm', what: `너무 여러 겹(${MAX_DEPTH}겹 넘게) 감싼 명령` };
       } else for (const inner of wrapped) {
-        const r = judge(inner, u, depth + 1);
+        const r = judge(inner, u, depth + 1, blockDepth);
         if (r && r.level === 'always') return r;
         if (r && !confirmHit) confirmHit = r;
       }
@@ -314,7 +328,9 @@ function decide(input) {
   let userText = typeof input.lastUserInput === 'string' ? input.lastUserInput : '';
   const conv = String(input.conversationId || '');
   if (!userText && ID_RE.test(conv)) { try { userText = JSON.parse(readFileSync(join(DATA_DIR, 'state', conv + '.json'), 'utf8')).lastUserText || ''; } catch {} }
-  const j = judge(cmd, String(userText).slice(0, 4000));
+  // 판정 중 오류(이상하게 긴·깊은 명령 등)는 "평소 권한대로"가 아니라 확인 요청으로 막는다 — 못 본 명령을 통과시키지 않게
+  let j;
+  try { j = judge(cmd, String(userText).slice(0, 4000)); } catch { j = { level: 'confirm', what: '위험 여부를 판정할 수 없는 명령' }; }
   if (!j) return { decision: 'ask' };
   const reason = j.level === 'always'
     ? `[위험 명령 차단] ${j.what}은(는) 되돌릴 수 없어 Antigravity Implant 가 항상 막습니다. 다른 방법을 쓰거나, 꼭 필요하면 무엇을 왜 해야 하는지 사용자에게 설명하고 사용자가 직접 실행하게 하세요.`

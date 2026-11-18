@@ -90,7 +90,7 @@ powershell -ExecutionPolicy Bypass -File .\install-computer-use.ps1
 node tests/run-all.mjs
 ```
 
-시험 196개. 임시 폴더를 가짜 사용자 폴더로 써서 실제 설정(`~/.gemini`)을 건드리지 않습니다. `cockpit-rewind-test` 는 앱이 깔아 둔 `sidecar_sdk` 가 있어야 하고, 없으면 건너뜁니다.
+시험 199개. 임시 폴더를 가짜 사용자 폴더로 써서 실제 설정(`~/.gemini`)을 건드리지 않습니다. `cockpit-rewind-test` 는 앱이 깔아 둔 `sidecar_sdk` 가 있어야 하고, 없으면 건너뜁니다.
 
 ## 왜 이렇게 만들었나 (실험으로 확인한 것)
 

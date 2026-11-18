@@ -101,7 +101,15 @@ try {
     const del = 'Remove-Item -Recurse -Force C:\\';
     const nestB = (n) => { let s = del; for (let i = 0; i < n; i++) s = `ForEach-Object { ${s} }`; return s; };
     const nestP = (n) => { let s = del; for (let i = 0; i < n; i++) s = `powershell -c "${s.replace(/"/g, "'")}"`; return s; };
-    check('여러 겹 블록 속 삭제도 항상 차단 (5·20·200겹)', [5, 20, 200].every((n) => lvl(nestB(n)) === 'always'), [5, 20, 200].map((n) => lvl(nestB(n))).join(','));
+    check('여러 겹 블록 속 삭제도 항상 차단 (5·20·60겹)', [5, 20, 60].every((n) => lvl(nestB(n)) === 'always'), [5, 20, 60].map((n) => lvl(nestB(n))).join(','));
+    check('64겹 넘는 블록은 못 본 채 통과시키지 않음 (200·3000겹)', [200, 3000].every((n) => lvl(nestB(n)) !== 'pass'), [200, 3000].map((n) => lvl(nestB(n))).join(','));
+    check('지나치게 긴 명령(10만 자 초과)은 확인 요청', lvl('echo ' + 'a'.repeat(100001)) === 'confirm', '');
+    {
+      let deep = del; for (let i = 0; i < 50000; i++) deep = '{ ' + deep + ' }';
+      const t = Date.now();
+      const hookOut = run('danger_guard.mjs', { conversationId: randomUUID(), toolCall: { name: 'run_command', args: { CommandLine: deep } } });
+      check('5만 겹 블록도 훅이 빠르게 막음 (스택 넘침·시간 초과로 통과 안 됨)', hookOut.out.decision === 'deny' && Date.now() - t < 4000, `${hookOut.raw.slice(0, 60)} ${Date.now() - t}ms`);
+    }
     check('powershell -c 를 너무 여러 겹 감싸면 못 본 채 통과시키지 않음', lvl(nestP(4)) === 'always' && lvl(nestP(8)) === 'confirm', `${lvl(nestP(4))} ${lvl(nestP(8))}`);
     check('리눅스·맥 경로는 posix 방식으로 정리 (/home/me 가 \\home\\me 로 바뀌지 않음)', normPath('/home/user/') === '/home/user/' && normPath('/home/user/../x') === '/home/x', normPath('/home/user/'));
   }
