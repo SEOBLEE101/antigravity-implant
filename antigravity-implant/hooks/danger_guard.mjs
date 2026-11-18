@@ -60,17 +60,19 @@ function innerCommands(stage) {
   const v = verbOf(toks[0] === '&' ? toks[1] : toks[0]);
   const res = [];
   if (v === 'cmd') {
-    const k = toks.findIndex((t) => /^\/[ck]$/i.test(t));
-    if (k >= 0) res.push(stage.slice(stage.search(/\s\/[ck]\s/i) + 3).trim().replace(/^"([\s\S]*)"$/, '$1'));
+    // cmd /c "…", cmd /c"…"(붙여 쓰기), cmd /s /c …
+    const mm = stage.match(/\s\/[ck](?=[\s"])\s*([\s\S]*)$/i);
+    if (mm) res.push(mm[1].trim().replace(/^"([\s\S]*)"$/, '$1').replace(/^"/, ''));
   }
   if (v === 'powershell' || v === 'pwsh') {
     const e = toks.findIndex((t) => /^-(e|ec|en|enc|enco|encod|encode|encoded|encodedc\w*)$/i.test(t));
     if (e >= 0) {
       let decoded = '';
       try { decoded = Buffer.from(String(toks[e + 1] || ''), 'base64').toString('utf16le'); } catch {}
-      // \uc81c\ub300\ub85c \ud480\ub838\ub294\uc9c0: \ub300\ubd80\ubd84 \ubcf4\uc774\ub294 ASCII \uae00\uc790\uc5ec\uc57c \ud55c\ub2e4 (\uc544\ub2c8\uba74 \ud480 \uc218 \uc5c6\ub294 \uac83\uc73c\ub85c \ubcf4\uace0 \ud655\uc778 \uc694\uccad)
-      const ascii = (decoded.match(/[\x09\x0a\x0d\x20-\x7e]/g) || []).length;
-      res.push(decoded.length >= 2 && ascii / decoded.length > 0.9 ? decoded : '\u0000ENCODED');
+      // \uc81c\ub300\ub85c \ud480\ub838\ub294\uc9c0: \ub300\ubd80\ubd84 \uc77d\uc744 \uc218 \uc788\ub294 \uae00\uc790(\ud55c\uae00 \uc8fc\uc11d \ub4f1 \ud3ec\ud568)\uc5ec\uc57c \ud55c\ub2e4. \uc544\ub2c8\uba74 \ud480 \uc218 \uc5c6\ub294 \uac83\uc73c\ub85c \ubcf4\uace0 \ud655\uc778 \uc694\uccad
+      const readable = (decoded.match(/[\p{L}\p{N}\p{P}\p{S}\s]/gu) || []).length;
+      const ascii = (decoded.match(/[\x20-\x7e]/g) || []).length;
+      res.push(decoded.length >= 2 && readable / decoded.length > 0.95 && ascii / decoded.length > 0.3 ? decoded : '\u0000ENCODED');
     }
     const c = toks.findIndex((t) => /^-c(o(m(m(a(n(d)?)?)?)?)?)?$/i.test(t));
     if (c >= 0) res.push(toks.slice(c + 1).join(' '));
@@ -93,7 +95,14 @@ export function normPath(t) {
   let p = String(t || '').trim();
   p = p.replace(/^-[a-z]+:(?=.)/i, ''); // -LiteralPath:C:\ → C:\
   p = p.replace(/^\\\\[?.]\\/, '').replace(/^\/\/[?.]\//, ''); // \\?\C:\ → C:\
-  if (/^[a-z]:[\\/]|^[\\/]/i.test(p) && /(^|[\\/])\.\.([\\/]|$)/.test(p)) p = win32.normalize(p); // C:\Users\..\Windows → C:\Windows
+  if (/^[a-z]:[\\/]|^[\\/]/i.test(p)) {
+    // Windows 는 폴더 이름 끝의 점·공백을 버린다(C:\Windows. = C:\Windows). 그다음 . .. 와 겹친 \ 를 정리한다
+    // (C:\Users\..\Windows → C:\Windows, C:\\ → C:\, C:\Users\me\. → C:\Users\me\)
+    p = p.split(/([\\/]+)/).map((seg, i) => (i % 2 || seg === '.' || seg === '..' || seg === '*') ? seg : seg.replace(/[. ]+$/, '')).join('');
+    const star = /[\\/]\*$/.test(p);
+    p = win32.normalize(p);
+    if (star && !/\*$/.test(p)) p += '*';
+  }
   return p;
 }
 export function isRootTarget(t) {
@@ -106,11 +115,13 @@ export function isRootTarget(t) {
 
 // ---------- 판정 ----------
 const DEL_VERBS = new Set(['remove-item', 'ri', 'rm', 'rmdir', 'rd', 'del', 'erase']);
-const RECURSE_TOK = /^(-r(e(c(u(r(s(e)?)?)?)?)?)?|-[a-z]*r[a-z]*f[a-z]*|-[a-z]*f[a-z]*r[a-z]*|--recursive|\/s)$/i;
+const RECURSE_TOK_RE = /^(-r(e(c(u(r(s(e)?)?)?)?)?)?(:\$?true)?|-[a-z]*r[a-z]*f[a-z]*|-[a-z]*f[a-z]*r[a-z]*|--recursive)$/i;
+// cmd 의 옵션은 붙여 쓸 수 있다: /s/q, /q/s → 하나씩 나눠서 /s 가 있나 본다
+const RECURSE_TOK = { test: (t) => RECURSE_TOK_RE.test(t) || (/^(\/[a-z?])+$/i.test(t) && /\/s(?![a-z])/i.test(t)) };
 const LIST_VERBS = new Set(['get-childitem', 'gci', 'ls', 'dir']);
 
 const ALWAYS = [
-  [/\bformat(\.com)?\s+[a-z]:/i, '디스크 포맷'],
+  [/\bformat(\.com)?\s+(\/\S+\s+)*[a-z]:/i, '디스크 포맷'], // format /FS:NTFS D: 처럼 옵션이 앞에 와도
   [/\b(format-volume|diskpart|clear-disk|initialize-disk|remove-partition|mkfs(\.\w+)?)\b/i, '디스크·파티션 초기화'],
   [/\bdd\s+[^|;&\r\n]*\bof=\/dev\//i, '디스크에 직접 쓰기'],
   [/\bbcdedit\b/i, '부팅 설정 변경'],
@@ -123,13 +134,23 @@ const CONFIRM = [
   [(s) => s.git && s.git.sub === 'push' && s.git.args.some((a) => /^--force(-with-lease)?(=.*)?$|^--force-if-includes$/.test(a) || /^-[a-z]*f[a-z]*$/i.test(a) || /^\+/.test(a)), '강제 푸시(git push --force)', /(--force|force[- ]?push|\bpush\s+-f\b|강제\s*(푸시|push|로)|덮어\s*써서\s*푸시)/i],
   [(s) => s.git && s.git.sub === 'reset' && s.git.args.includes('--hard'), 'git reset --hard (커밋 안 한 변경 사라짐)', /(reset\s+--hard|하드\s*리셋|git\s+reset)/i],
   [(s) => s.git && s.git.sub === 'clean' && s.git.args.some((a) => /^-[a-z]*f/i.test(a) || a === '--force') && !s.git.args.some((a) => /^-[a-z]*n|^--dry-run$/i.test(a)), 'git clean -f (git 에 없는 파일 삭제)', /(git\s+clean|untracked|추적\s*(안|하지\s*않)\s*(된|는|은)\s*파일)/i],
-  [(s) => /\b(reg(\.exe)?\s+(add|delete|import|load|unload|restore|copy)\b|(set|new|remove|rename)-item(property)?\s+[^|]*\bhk(lm|cu|cr|u|cc):|\bhkey_(local_machine|current_user|classes_root|users))/i.test(s.bare), '레지스트리 변경', /(레지스트리|registry|\breg(\.exe)?\s|hklm|hkcu|hkcr|hku\b|hkcc)/i],
+  [(s) => /\b(reg(\.exe)?\s+(add|delete|import|load|unload|restore|copy)\b|\bhkey_(local_machine|current_user|classes_root|users))/i.test(s.bare) || isRegistryWrite(s), '레지스트리 변경', /(레지스트리|registry|\breg(\.exe)?\s|hklm|hkcu|hkcr|hku\b|hkcc)/i],
   [(s) => /\bsetx\b|\[(system\.)?environment\]::setenvironmentvariable\s*\([^)]*(machine|user)/i.test(s.text), '영구 환경 변수 변경', /(환경\s*변수|environment\s+variable|\bsetx\b)/i],
   [(s) => /\bset-executionpolicy\b/i.test(s.bare), '스크립트 실행 정책 변경', /(실행\s*정책|executionpolicy)/i],
   [(s) => /^(sc)$/.test(s.verb) && /^(delete|config|create|stop|failure)$/i.test(s.toks[1] || '') || /^(stop|set|remove|new|restart|suspend)-service$/.test(s.verb), '윈도우 서비스 변경', /(서비스\s*(를|을)?\s*(중지|멈춰|삭제|지워|바꿔|변경|만들어|재시작)|\bservices?\b\s*(stop|restart|delete|config)|\b(stop|restart|set|remove|new)-service\b|\bsc(\.exe)?\s+(stop|delete|config|create))/i],
   [(s) => (s.verb === 'shutdown' && s.toks.slice(1).some((a) => /^[\/-]/.test(a))) || /^(restart-computer|stop-computer)$/.test(s.verb), '컴퓨터 끄기·재시작', /(재부팅|재시작해|컴퓨터\s*(를|을)?\s*(꺼|끄|종료)|\bshutdown\b|\breboot\b|restart-computer|stop-computer)/i],
   [(s) => /antigravity-implant/i.test(s.text) && (/[\\/](off|config\.json|hooks\.json)\b/i.test(s.text) || /plugins[\\/]antigravity-implant/i.test(s.text)) && /(new-item|set-content|add-content|out-file|remove-item|\bri\b|\bdel\b|\brm\b|copy|move|\bni\b|>)/i.test(s.text), 'Antigravity Implant 자체를 끄거나 바꾸는 명령', /(implant|임플란트|훅\s*(을|를)?\s*(꺼|끄|지워)|플러그인\s*(을|를)?\s*(꺼|끄|지워))/i],
 ];
+
+// 레지스트리를 바꾸는 PowerShell 명령: 명령 이름이 쓰기 동사이고, 인자(따옴표를 벗긴 것) 중 하나가 레지스트리 경로.
+// 따옴표 안 경로("HKCU:\…")도 잡되, Write-Output "Set-ItemProperty HKCU:\x" 같은 글자는 명령 이름이 아니라 통과.
+const REG_WRITE_VERBS = new Set(['set-itemproperty', 'new-itemproperty', 'remove-itemproperty', 'rename-itemproperty', 'clear-itemproperty',
+  'set-item', 'new-item', 'remove-item', 'rename-item', 'copy-item', 'move-item', 'clear-item', 'copy-itemproperty', 'move-itemproperty',
+  'sp', 'rp', 'rnp', 'clp', 'cpp', 'mp', 'si', 'ni', 'ri', 'rni', 'cpi', 'mi', 'cli', 'del', 'rm', 'erase', 'rd', 'rmdir']);
+const REG_PATH_RE = /^(-[a-z]+:)?(hk(lm|cu|cr|u|cc):|registry::|microsoft\.powershell\.core\\registry::)/i;
+function isRegistryWrite(s) {
+  return REG_WRITE_VERBS.has(s.verb) && s.toks.slice(1).some((t) => REG_PATH_RE.test(t));
+}
 
 function gitInfo(toks) {
   if (verbOf(toks[0]) !== 'git') return null;
@@ -141,6 +162,16 @@ function gitInfo(toks) {
 }
 
 function stageInfo(stage) {
+  // 스크립트 블록·묶음 괄호를 벗긴다: "& { Remove-Item … }", "{ … }", "(rd /s /q C:\)" → 속 명령. (; 로 나뉜 뒤 남은 } 조각도)
+  //  끝의 } ) 는 짝이 안 맞을 때만 벗긴다 (${HOME}, $(pwd) 같은 건 그대로)
+  stage = String(stage).replace(/^[\s&{(]+(?=\S)/, (m) => (/[{(]/.test(m) ? '' : m));
+  const cnt = (ch) => (blankQuotes(stage).split(ch).length - 1);
+  while (/[})]\s*$/.test(stage)) {
+    const last = stage.trimEnd().slice(-1), open = last === '}' ? '{' : '(';
+    if (cnt(last) <= cnt(open)) break;
+    stage = stage.trimEnd().slice(0, -1);
+  }
+  stage = stage.trim();
   const toks = tokenize(stage);
   const head = toks[0] === '&' ? toks.slice(1) : toks;
   const bare = blankQuotes(stage);
@@ -151,7 +182,8 @@ function stageInfo(stage) {
   return { text: stage, bare, toks: head, verb, glued, git: gitInfo(head) };
 }
 
-const DOWNLOAD_RE = /^(iwr|irm|invoke-webrequest|invoke-restmethod|curl|wget|start-bitstransfer|certutil|bitsadmin)$/;
+const normUrl = (x) => String(x).replace(/[.,;:!?)\]]+$/, '').replace(/\/+$/, '').toLowerCase();
+const DOWNLOAD_RE =/^(iwr|irm|invoke-webrequest|invoke-restmethod|curl|wget|start-bitstransfer|certutil|bitsadmin)$/;
 const RUNNER_RE = /^(iex|invoke-expression|sh|bash|zsh|python[0-9.]*|py|node|pwsh|powershell|cmd)$/;
 
 // 결과: null 또는 { level: 'always'|'confirm', what }
@@ -195,8 +227,10 @@ export function judge(cmd, userText, depth = 0) {
       for (const [re, what] of ALWAYS) if (re.test(s.bare)) return { level: 'always', what };
 
       // 2) 인터넷 스크립트: 받아서 바로 실행(파이프·iex), 또는 받아 둔 파일을 다음 문장에서 실행
+      // 사용자가 그 주소를 "그대로" 줬을 때만 (앞부분만 같은 다른 주소는 안 됨: …/x.ps1 ≠ …/x.ps1.bak)
       const urls = s.text.match(/https?:\/\/[^\s'"|)]+/gi) || [];
-      const urlOk = urls.length > 0 && urls.every((x) => u.includes(x.replace(/\/+$/, '')));
+      const userUrls = new Set((u.match(/https?:\/\/[^\s'"|)<>]+/gi) || []).map(normUrl));
+      const urlOk = urls.length > 0 && urls.every((x) => userUrls.has(normUrl(x)));
       if (DOWNLOAD_RE.test(s.verb)) {
         const next = infos[i + 1];
         if (next && RUNNER_RE.test(next.verb) && !urlOk) confirmHit = confirmHit || { level: 'confirm', what: '인터넷에서 받은 스크립트를 바로 실행' };

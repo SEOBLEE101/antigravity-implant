@@ -92,7 +92,7 @@ What it cannot fix: tools that do not exist inside the sandbox (for example a br
 node tests/run-all.mjs
 ```
 
-186 checks. Each run uses a temporary fake home folder, so your real `~/.gemini` is never touched. `cockpit-rewind-test` needs the `sidecar_sdk` that the Antigravity app installs and is skipped otherwise.
+190 checks. Each run uses a temporary fake home folder, so your real `~/.gemini` is never touched. `cockpit-rewind-test` needs the `sidecar_sdk` that the Antigravity app installs and is skipped otherwise.
 
 ## Why it is built this way (verified by experiment)
 
