@@ -16,7 +16,7 @@
 //     풀 수 없는 인코딩 명령
 // 한계: 명령 문자열만 본다. 스크립트 파일 안에 숨긴 명령이나 다른 도구(파일 편집)로 하는 일은 못 막는다.
 import { readFileSync, existsSync } from 'node:fs';
-import { join, win32 } from 'node:path';
+import { join, win32, posix } from 'node:path';
 import { homedir } from 'node:os';
 
 const DATA_DIR = join(homedir(), '.gemini', 'antigravity-implant');
@@ -54,11 +54,31 @@ function tokenize(s) {
 const blankQuotes = (s) => s.replace(/"[^"]*"?|'[^']*'?/g, ' ');
 const verbOf = (tok) => String(tok || '').toLowerCase().replace(/^&$/, '').replace(/^.*[\\/]/, '').replace(/\.(exe|com|cmd|bat)$/, '');
 
-// cmd /c "…", powershell -c "…", -EncodedCommand → 속 명령
+// 명령 중간의 스크립트 블록 { … } 과 $( … ) 의 속 (따옴표 밖, 바깥쪽 것만): ForEach-Object { Remove-Item … }
+function blocksOf(stage) {
+  const out = [];
+  let q = '', depth = 0, start = -1, closer = '';
+  for (let i = 0; i < stage.length; i++) {
+    const ch = stage[i];
+    if (q) { if (ch === q) q = ''; continue; }
+    if (ch === '"' || ch === "'") { q = ch; continue; }
+    if (depth === 0) {
+      if (ch === '{' || (ch === '(' && stage[i - 1] === '$')) { depth = 1; start = i + 1; closer = ch === '{' ? '}' : ')'; }
+      continue;
+    }
+    const opener = closer === '}' ? '{' : '(';
+    if (ch === opener) depth++;
+    else if (ch === closer && --depth === 0) { out.push(stage.slice(start, i)); }
+  }
+  if (depth > 0 && start >= 0) out.push(stage.slice(start)); // 닫히지 않은 블록도 본다
+  return out.filter((b) => b.trim());
+}
+
+// cmd /c "…", powershell -c "…", -EncodedCommand, 스크립트 블록 → 속 명령
 function innerCommands(stage) {
   const toks = tokenize(stage);
   const v = verbOf(toks[0] === '&' ? toks[1] : toks[0]);
-  const res = [];
+  const res = [...blocksOf(stage)];
   if (v === 'cmd') {
     // cmd /c "…", cmd /c"…"(붙여 쓰기), cmd /s /c …
     const mm = stage.match(/\s\/[ck](?=[\s"])\s*([\s\S]*)$/i);
@@ -95,7 +115,12 @@ export function normPath(t) {
   let p = String(t || '').trim();
   p = p.replace(/^-[a-z]+:(?=.)/i, ''); // -LiteralPath:C:\ → C:\
   p = p.replace(/^\\\\[?.]\\/, '').replace(/^\/\/[?.]\//, ''); // \\?\C:\ → C:\
-  if (/^[a-z]:[\\/]|^[\\/]/i.test(p)) {
+  if (/^\/(?![\/?.])/.test(p) && !p.includes('\\')) {
+    // 리눅스·맥 경로(/home/me)는 posix 방식으로 정리 (Windows 방식으로 바꾸면 \home\me 가 되어 홈 비교가 깨진다)
+    const star = /\/\*$/.test(p);
+    p = posix.normalize(p);
+    if (star && !/\*$/.test(p)) p += '*';
+  } else if (/^[a-z]:[\\/]|^[\\/]/i.test(p)) {
     // Windows 는 폴더 이름 끝의 점·공백을 버린다(C:\Windows. = C:\Windows). 그다음 . .. 와 겹친 \ 를 정리한다
     // (C:\Users\..\Windows → C:\Windows, C:\\ → C:\, C:\Users\me\. → C:\Users\me\)
     p = p.split(/([\\/]+)/).map((seg, i) => (i % 2 || seg === '.' || seg === '..' || seg === '*') ? seg : seg.replace(/[. ]+$/, '')).join('');
@@ -134,7 +159,8 @@ const CONFIRM = [
   [(s) => s.git && s.git.sub === 'push' && s.git.args.some((a) => /^--force(-with-lease)?(=.*)?$|^--force-if-includes$/.test(a) || /^-[a-z]*f[a-z]*$/i.test(a) || /^\+/.test(a)), '강제 푸시(git push --force)', /(--force|force[- ]?push|\bpush\s+-f\b|강제\s*(푸시|push|로)|덮어\s*써서\s*푸시)/i],
   [(s) => s.git && s.git.sub === 'reset' && s.git.args.includes('--hard'), 'git reset --hard (커밋 안 한 변경 사라짐)', /(reset\s+--hard|하드\s*리셋|git\s+reset)/i],
   [(s) => s.git && s.git.sub === 'clean' && s.git.args.some((a) => /^-[a-z]*f/i.test(a) || a === '--force') && !s.git.args.some((a) => /^-[a-z]*n|^--dry-run$/i.test(a)), 'git clean -f (git 에 없는 파일 삭제)', /(git\s+clean|untracked|추적\s*(안|하지\s*않)\s*(된|는|은)\s*파일)/i],
-  [(s) => /\b(reg(\.exe)?\s+(add|delete|import|load|unload|restore|copy)\b|\bhkey_(local_machine|current_user|classes_root|users))/i.test(s.bare) || isRegistryWrite(s), '레지스트리 변경', /(레지스트리|registry|\breg(\.exe)?\s|hklm|hkcu|hkcr|hku\b|hkcc)/i],
+  // 예전 전체 글 검사(따옴표 밖)도 그대로 둔다: 명령 이름이 맨 앞이 아니어도(파이프 안 등) 잡히게
+  [(s) => /\b(reg(\.exe)?\s+(add|delete|import|load|unload|restore|copy)\b|\b(set|new|remove|rename|clear|copy|move)-item(property)?\b[^|]*\bhk(lm|cu|cr|u|cc):|\bhkey_(local_machine|current_user|classes_root|users))/i.test(s.bare) || isRegistryWrite(s), '레지스트리 변경', /(레지스트리|registry|\breg(\.exe)?\s|hklm|hkcu|hkcr|hku\b|hkcc)/i],
   [(s) => /\bsetx\b|\[(system\.)?environment\]::setenvironmentvariable\s*\([^)]*(machine|user)/i.test(s.text), '영구 환경 변수 변경', /(환경\s*변수|environment\s+variable|\bsetx\b)/i],
   [(s) => /\bset-executionpolicy\b/i.test(s.bare), '스크립트 실행 정책 변경', /(실행\s*정책|executionpolicy)/i],
   [(s) => /^(sc)$/.test(s.verb) && /^(delete|config|create|stop|failure)$/i.test(s.toks[1] || '') || /^(stop|set|remove|new|restart|suspend)-service$/.test(s.verb), '윈도우 서비스 변경', /(서비스\s*(를|을)?\s*(중지|멈춰|삭제|지워|바꿔|변경|만들어|재시작)|\bservices?\b\s*(stop|restart|delete|config)|\b(stop|restart|set|remove|new)-service\b|\bsc(\.exe)?\s+(stop|delete|config|create))/i],
@@ -165,6 +191,12 @@ function stageInfo(stage) {
   // 스크립트 블록·묶음 괄호를 벗긴다: "& { Remove-Item … }", "{ … }", "(rd /s /q C:\)" → 속 명령. (; 로 나뉜 뒤 남은 } 조각도)
   //  끝의 } ) 는 짝이 안 맞을 때만 벗긴다 (${HOME}, $(pwd) 같은 건 그대로)
   stage = String(stage).replace(/^[\s&{(]+(?=\S)/, (m) => (/[{(]/.test(m) ? '' : m));
+  // 결과를 변수에 담는 모양: "$x = Remove-Item …", "[void]$x = …", "$null = New-Item …" → 오른쪽 명령
+  for (let k = 0; k < 3; k++) {
+    const next = stage.replace(/^(\[[\w.]+\]\s*)?\$[\w:{}]+\s*[+\-*/]?=\s*/, '').replace(/^\[[\w.]+\]\s*(?=[$(])/, '').replace(/^[\s&{(]+(?=\S)/, (m) => (/[{(]/.test(m) ? '' : m));
+    if (next === stage) break;
+    stage = next;
+  }
   const cnt = (ch) => (blankQuotes(stage).split(ch).length - 1);
   while (/[})]\s*$/.test(stage)) {
     const last = stage.trimEnd().slice(-1), open = last === '}' ? '{' : '(';
