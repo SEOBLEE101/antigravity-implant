@@ -52,7 +52,7 @@ export function atomicWrite(file, text) {
 // ---------- 입출력 ----------
 export function readStdin() {
   try {
-    const raw = readFileSync(0, 'utf8');
+    const raw = readFileSync(0, 'utf8').replace(/^﻿/, ''); // 앞에 BOM 이 붙어 와도 읽는다
     return raw.trim() ? JSON.parse(raw) : {};
   } catch {
     return {};

@@ -298,7 +298,8 @@ runHook('PreInvocation', (input) => {
   // 도는 에이전트도 쓸 수 있어 위조할 수 있기 때문. 사용자가 그런 때 저장했다면 패널 「훅 기록」에 "무시"가 보이고, 다시 저장하면 적용된다.
   if (liveM !== state.liveRulesMtime && liveM) {
     const suspicious = ranCommand || editedPaths.includes(normKey(cfg.liveRulesFile)) || sinceLast.some((c) => /live_rules/i.test(JSON.stringify(c.args || {})));
-    if (suspicious && state.liveRulesMtime !== undefined) { kinds.push('실시간 규칙 바뀜(명령이 도는 중이라 무시 — 다시 저장하면 적용)'); state.liveRulesMtime = liveM; }
+    // 이 대화에서 처음 보는 경우(undefined)도 같은 기준: 명령이 도는 사이에 바뀐 것이면 받아들이지 않는다
+    if (suspicious) { kinds.push('실시간 규칙 바뀜(명령이 도는 중이라 무시 — 다시 저장하면 적용)'); state.liveRulesMtime = liveM; }
   }
   if (liveM !== state.liveRulesMtime) {
     state.liveRulesText = liveM ? readText(cfg.liveRulesFile, cfg.liveRulesMaxChars) : '';

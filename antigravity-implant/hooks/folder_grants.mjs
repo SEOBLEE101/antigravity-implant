@@ -12,7 +12,7 @@
 //       기억하지 않는다(파일을 읽거나 쓴 것만). 읽기와 쓰기는 따로. 기억한 폴더는 folder-grants.json 에도 적어 두고,
 //       앱이 옛 설정으로 덮어써 규칙이 빠지면 syncGrants() 가 다시 채운다.
 // 사용: node folder_grants.mjs   (PostToolUse)
-import { readFileSync, existsSync, appendFileSync, mkdirSync, statSync } from 'node:fs';
+import { readFileSync, existsSync, appendFileSync, mkdirSync, statSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, dirname, win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,9 +28,14 @@ const norm = (p) => String(p || '').replace(/\//g, '\\').replace(/\\+$/, '').toL
 const within = (p, dir) => { const a = norm(p), b = norm(dir); return !!b && (a === b || a.startsWith(b + '\\')); };
 
 // 폴더 단위로 넓혀도 되는 폴더 (원래 대소문자 표기, 백슬래시). 안 되면 null.
+// Windows 는 같은 폴더를 여러 표기로 가리킬 수 있다: 끝의 점·공백("C:\Windows.\x"), 짧은 이름("C:\PROGRA~1"),
+// 대체 데이터 스트림("a.txt:x"), "\\?\" 접두사. 이런 표기는 제외 규칙을 비껴갈 수 있으므로 아예 넓히지 않는다.
+const ODD_SEGMENT = (s) => /[. ]$/.test(s) || /~\d/.test(s) || s.includes(':');
 export function folderFor(path) {
-  if (!/^[a-z]:[\\/]/i.test(String(path || ''))) return null;
-  const orig = win32.resolve(String(path)).replace(/\\+$/, ''); // C:\a\..\Windows\x → C:\Windows\x
+  const raw = String(path || '');
+  if (!/^[a-z]:[\\/]/i.test(raw) || raw.startsWith('\\\\')) return null;
+  if (raw.slice(2).split(/[\\/]+/).some((s) => s && s !== '.' && s !== '..' && ODD_SEGMENT(s))) return null;
+  const orig = win32.resolve(raw).replace(/\\+$/, ''); // C:\a\..\Windows\x → C:\Windows\x
   const dirOrig = win32.dirname(orig);
   const dir = norm(dirOrig);
   const home = norm(homedir());
@@ -100,15 +105,17 @@ export function bypassFolders(args) {
   const a = args || {};
   const cmd = String(argVal(a.CommandLine || a.command || '') || '');
   const cands = [];
-  const cwd = argVal(a.Cwd || a.cwd);
-  if (typeof cwd === 'string' && /^[a-z]:[\\/]/i.test(cwd)) cands.push(win32.join(cwd, '_'));
+  // 작업 위치(Cwd)만으로는 넣지 않는다: 그 폴더에 실제로 썼는지 알 수 없다
   for (const m of cmd.matchAll(/(?:"([a-z]:[\\/][^"\r\n]*)"|'([a-z]:[\\/][^'\r\n]*)'|(?<![\w])([a-z]:[\\/][^\s"'`;|&<>()]*))/gi)) {
     let p = (m[1] || m[2] || m[3] || '').replace(/[\\/]+$/, '');
     if (!p || /[*?]/.test(p)) continue; // 와일드카드는 판단하지 않는다
     if (EXEC_RE.test(p)) continue; // 실행한 프로그램(C:\ffmpeg\bin\ffmpeg.exe 등)의 폴더에는 쓰기를 넓히지 않는다
     try {
-      const st = statSync(p);
-      cands.push(st.isDirectory() ? win32.join(p, '_') : p); // 폴더 자체가 나오면 그 폴더, 파일이면 그 파일의 폴더
+      // 진짜 경로로 바꾼 뒤 판단하고, 규칙도 그 진짜 경로로 쓴다 (짧은 이름·정션·심볼릭 링크로 제외 규칙을 비껴가지 않게)
+      const real = realpathSync.native(p);
+      if (!/^[a-z]:\\/i.test(real)) continue; // \\?\ · UNC 등은 넓히지 않는다
+      const st = statSync(real);
+      cands.push(st.isDirectory() ? win32.join(real, '_') : real); // 폴더 자체가 나오면 그 폴더, 파일이면 그 파일의 폴더
     } catch {}
   }
   const out = [];
@@ -139,7 +146,8 @@ export function onPostToolUse(input) {
   const call = input.toolCall || {};
   const inWorkspace = (p) => (input.workspacePaths || []).some((w) => within(win32.resolve(p), w));
   if (call.name === 'run_command') {
-    if (cfg.folderGrantsFromCommands === false || !isTrue((call.args || {}).BypassSandbox)) return;
+    // 기본은 꺼짐: 명령 글자만 보고는 그 명령이 정말 어디에 썼는지 알 수 없다. 사용자가 켰을 때만.
+    if (cfg.folderGrantsFromCommands !== true || !isTrue((call.args || {}).BypassSandbox)) return;
     for (const folder of bypassFolders(call.args)) {
       if (!inWorkspace(folder)) remember('write', folder, 'run_command(BypassSandbox): ' + String(argVal((call.args || {}).CommandLine) || '').slice(0, 200));
     }
@@ -149,7 +157,14 @@ export function onPostToolUse(input) {
   const path = argPath(call.args); // 상대 경로는 작업 폴더 안이라 대상이 아니다 → 절대 경로만
   if (!kind || !path || !/^[a-z]:[\\/]/i.test(path)) return;
   if (inWorkspace(path)) return; // 작업 폴더 안
-  const folder = folderFor(path);
+  // 정션·심볼릭 링크·짧은 이름을 풀어서 판단한다. 파일이 없으면 그 폴더의 진짜 경로 + 파일 이름. 폴더도 못 풀면 넓히지 않는다.
+  let real;
+  try { real = realpathSync.native(path); } catch {
+    try { real = win32.join(realpathSync.native(win32.dirname(path)), win32.basename(path)); } catch { return; }
+  }
+  if (!/^[a-z]:\\/i.test(real)) return;
+  if (real !== path && inWorkspace(real)) return;
+  const folder = folderFor(real);
   if (!folder) return;
   remember(kind, folder, path);
 }

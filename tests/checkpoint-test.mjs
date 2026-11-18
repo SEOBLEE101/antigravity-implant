@@ -91,6 +91,18 @@ writeFileSync(join(hk, 'a.txt'), 'x'); execFileSync('git', ['-C', hk, 'add', '-A
 writeFileSync(join(hk, '.git', 'hooks', 'reference-transaction'), `#!/bin/sh\necho 1 > "${hk.replace(/\\/g, '/')}/PWNED"\n`);
 const hr = snapshot(hk, 'hooktest/x');
 check('저장소 훅(reference-transaction)이 실행되지 않음', hr && !existsSync(join(hk, 'PWNED')), `snap=${!!hr} pwned=${existsSync(join(hk, 'PWNED'))}`);
+// 바뀐 게 없는 턴: 작업자가 새로 찍은 ref 를 지운다(update-ref -d) — 이때도 훅이 돌면 안 된다
+const convH = randomUUID();
+const pH = Buffer.from(JSON.stringify({ dirs: [hk], userText: 'x' })).toString('base64');
+spawnSync(process.execPath, [join(root, 'hooks', 'checkpoint_worker.mjs'), convH, '0', pH], { encoding: 'utf8' });
+spawnSync(process.execPath, [join(root, 'hooks', 'checkpoint_worker.mjs'), convH, '1', pH], { encoding: 'utf8' });
+check('변경 없는 턴의 ref 지우기에서도 저장소 훅이 실행되지 않음', !existsSync(join(hk, 'PWNED')), 'PWNED 생김');
+// 작업 폴더를 저장소 밖으로 돌리는 core.worktree 설정이 있으면 찍지 않는다
+const wt = mkdtempSync(join(tmpdir(), 'agyc-wt-'));
+execFileSync('git', ['-C', wt, 'init', '-q']); execFileSync('git', ['-C', wt, 'config', 'core.worktree', tmpdir().replace(/\\/g, '/')]);
+const { hasLocalExecConfig } = await import(pathToFileURL(join(root, 'hooks', 'lib', 'checkpoint.mjs')).href);
+check('core.worktree 설정이 있는 저장소는 위험으로 봄', hasLocalExecConfig(wt) === true, 'false');
+rmSync(wt, { recursive: true, force: true });
 rmSync(hk, { recursive: true, force: true });
 
 rmSync(repo, { recursive: true, force: true }); rmSync(plain, { recursive: true, force: true });

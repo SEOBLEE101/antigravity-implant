@@ -671,6 +671,7 @@
       if (!(r.repos || []).length) { $('diff').innerHTML = '<div class="empty muted">작업 폴더를 모릅니다. 이 대화에서 에이전트가 한 번 일하면 생깁니다.</div>'; return; }
       $('diff').innerHTML = r.repos.map((repo) => {
         if (!repo.git) return `<div class="item muted">${esc(repo.dir)} — git 저장소가 아니라 변경을 비교할 수 없습니다.</div>`;
+        if (repo.blocked) return `<div class="item"><b>${esc(repo.root)}</b><div class="muted">${esc(repo.blocked)}</div></div>`;
         const status = repo.status.trim();
         if (!status) return `<div class="item"><b>${esc(repo.root)}</b><div class="muted">커밋 안 한 변경 없음</div></div>`;
         const files = repo.diff.split(/^diff --git /m).filter(Boolean);

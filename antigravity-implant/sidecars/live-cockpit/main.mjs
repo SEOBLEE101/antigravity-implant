@@ -21,6 +21,8 @@ const SDK_CANDIDATES = [
 ];
 const sdkPath = SDK_CANDIDATES.find((p) => existsSync(p));
 if (!sdkPath) { process.stderr.write('live-cockpit: sidecar_sdk 를 찾지 못했습니다. Antigravity 앱을 한 번 실행한 뒤 다시 시도하세요.\n'); process.exit(1); }
+// 토큰은 SDK 를 불러오기 "전에" 정한다 (SDK 가 불러올 때 환경 변수를 읽어 둘 수 있으므로). 설명은 아래 "요청 보호".
+if (!process.env.ANTIGRAVITY_SIDECAR_UI_TOKEN) process.env.ANTIGRAVITY_SIDECAR_UI_TOKEN = randomBytes(24).toString('hex');
 const { SidecarApp, Response } = await import(pathToFileURL(sdkPath).href);
 const PLUGIN_ROOT = resolve(here, '..', '..');
 const HOME = homedir();
@@ -29,6 +31,7 @@ const IMG_RE = /\.(png|jpe?g|webp|gif)$/i;
 const MIME = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif' };
 // 데이터 폴더·원자적 저장은 훅과 같은 코드를 쓴다 (옛 이름 폴더 자동 이전도 여기서 같이 일어남)
 const { DATA_DIR, atomicWrite } = await import(pathToFileURL(join(PLUGIN_ROOT, 'hooks', 'lib', 'common.mjs')).href);
+const { hasLocalExecConfig } = await import(pathToFileURL(join(PLUGIN_ROOT, 'hooks', 'lib', 'checkpoint.mjs')).href);
 const STATE_DIR = join(DATA_DIR, 'state');
 const CP_ID_RE = /^[\w.-]{1,80}$/; // 체크포인트 번호 또는 id (빈 값·옵션처럼 생긴 값 거부)
 const LIVE_RULES = join(HOME, '.gemini', 'config', 'live_rules.md');
@@ -42,17 +45,34 @@ const LIVE_RULES_TEMPLATE = `<!--
 // ---------- 요청 보호 ----------
 // 1) 토큰: 앱이 ANTIGRAVITY_SIDECAR_UI_TOKEN 을 주면 SDK 가 모든 POST 에서 검사한다. 안 주면(직접 실행 등) 무방비가 되므로
 //    여기서 무작위 토큰을 만들어 건다 — 다른 웹페이지가 몰래 POST(규칙 쓰기·되돌리기·메시지 보내기)를 보내지 못하게.
-//    패널 페이지에는 그 토큰을 넣어 주고, preload 가 읽도록 주소에 ?token= 을 붙인다.
-if (!process.env.ANTIGRAVITY_SIDECAR_UI_TOKEN) process.env.ANTIGRAVITY_SIDECAR_UI_TOKEN = randomBytes(24).toString('hex');
+//    패널 페이지에는 그 토큰을 넣어 주고, preload 가 읽도록 주소에 ?token= 을 붙인다. (토큰 생성은 SDK import 앞)
 const UI_TOKEN = process.env.ANTIGRAVITY_SIDECAR_UI_TOKEN;
 // 2) 호스트 이름: 127.0.0.1 / localhost 로 온 요청만 받는다 (DNS rebinding 으로 다른 사이트가 페이지·토큰을 읽는 것 방지)
+// 3) 다른 사이트에서 온 /api 요청은 GET 이라도 거부: <img src="http://127.0.0.1:포트/api/diff…"> 같은 몰래 요청이
+//    git 을 반복 실행시키지 못하게. 브라우저가 붙이는 Sec-Fetch-Site / Origin 으로 판단한다 (패널 자신은 same-origin).
+const LOCAL_HOST_RE = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/;
+function badRequestFrom(req) {
+  const host = String(req.headers.host || '').toLowerCase();
+  if (!LOCAL_HOST_RE.test(host)) return 'forbidden host';
+  if (String(req.url || '').startsWith('/api/')) {
+    const site = String(req.headers['sec-fetch-site'] || '').toLowerCase();
+    if (site === 'cross-site' || site === 'same-site') return 'forbidden cross-site request';
+    const origin = String(req.headers.origin || '').toLowerCase();
+    if (origin && origin !== 'null') {
+      let o = ''; try { o = new URL(origin).host; } catch {}
+      if (o !== host) return 'forbidden origin';
+    }
+  }
+  return '';
+}
 const ORIG_EMIT = http.Server.prototype.emit;
 http.Server.prototype.emit = function (ev, req, res) {
   if (ev === 'request' && req && res) {
-    const host = String(req.headers.host || '').toLowerCase();
-    if (!/^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/.test(host)) {
-      res.writeHead(403, { 'Content-Type': 'text/plain' }); res.end('forbidden host'); return true;
-    }
+    const bad = badRequestFrom(req);
+    if (bad) { res.writeHead(403, { 'Content-Type': 'text/plain' }); res.end(bad); return true; }
+  }
+  if (ev === 'upgrade' && req && res) { // 웹소켓 연결도 같은 검사 (res 자리에 소켓이 온다)
+    if (badRequestFrom(req)) { try { res.destroy(); } catch {} return true; }
   }
   return ORIG_EMIT.apply(this, arguments);
 };
@@ -441,6 +461,8 @@ app.api('/api/diff', async (q) => {
     const repos = await Promise.all(dirs.map(async (d) => {
       const top = await git(d, ['rev-parse', '--show-toplevel']);
       if (!top.ok) return { dir: d, git: false };
+      // 저장소 자체 설정에 filter 등 외부 프로그램 실행 설정이 있으면 git status/diff 만으로도 그 프로그램이 돈다 → 보여주지 않는다
+      if (hasLocalExecConfig(d)) return { dir: d, git: true, root: top.out.trim(), status: '', stat: '', diff: '', blocked: '이 저장소 설정(.git/config)에 외부 프로그램을 실행하는 항목(filter 등)이 있어 안전을 위해 변경을 보여주지 않습니다.' };
       const [status, stat, diff] = await Promise.all([
         git(d, ['status', '--porcelain=v1', '-unormal']),
         git(d, ['diff', 'HEAD', '--no-ext-diff', '--no-textconv', '--stat']),

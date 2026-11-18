@@ -43,7 +43,8 @@ function git(cwd, args, opts = {}) {
 const lines0 = (s) => String(s || '').split('\0').filter(Boolean);
 
 // 저장소 자체 설정(local·worktree 범위, include 로 끌어온 것 포함)에 외부 프로그램을 부를 수 있는 항목이 있나
-const EXEC_KEYS = /^(filter\.|include\.|includeif\.|extensions\.worktreeconfig|core\.(fsmonitor|hookspath|sshcommand|gitproxy|askpass|editor|pager|alternaterefscommand)|diff\..*\.(textconv|command)|merge\..*\.driver|gpg\.|commit\.gpgsign|tag\.gpgsign|credential\.|uploadpack\.|receive\.)/i;
+// core.worktree 는 프로그램 실행은 아니지만 작업 폴더를 저장소 밖으로 돌려 바깥 파일을 찍고·되돌리게 하므로 같이 막는다
+const EXEC_KEYS = /^(filter\.|include\.|includeif\.|extensions\.worktreeconfig|core\.(fsmonitor|hookspath|sshcommand|gitproxy|askpass|editor|pager|alternaterefscommand|worktree)|diff\.external|diff\..*\.(textconv|command)|merge\..*\.driver|gpg\.|commit\.gpgsign|tag\.gpgsign|credential\.|uploadpack\.|receive\.)/i;
 export function hasLocalExecConfig(repo) {
   try {
     const out = git(repo, ['config', '--includes', '--show-scope', '--name-only', '--list'], { timeout: 5000 });
@@ -52,6 +53,11 @@ export function hasLocalExecConfig(repo) {
       return m && /^(local|worktree)$/i.test(m[1]) && EXEC_KEYS.test(m[2].trim()); // command 범위 = 우리가 -c 로 넣은 안전 설정이라 제외
     });
   } catch { return true; } // 확인을 못 하면 안전하게 "있다"로 본다
+}
+
+// ref 지우기도 reference-transaction 훅을 부르므로 반드시 안전 설정(GIT_SAFE: 빈 훅 폴더)으로
+export function deleteRef(repo, ref) {
+  try { git(repo, ['update-ref', '-d', ref], { timeout: 10000 }); return true; } catch { return false; }
 }
 
 export function repoRoot(dir) {

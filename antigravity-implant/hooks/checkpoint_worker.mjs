@@ -2,9 +2,8 @@
 // 사용: node --max-old-space-size=256 checkpoint_worker.mjs <conversationId> <turnIdx> <base64(JSON: {dirs, userText})>
 // 상한: node 힙 256MB, git 명령 하나당 30초(checkpoint.mjs), 새 파일 5000개 초과면 새 파일 제외,
 //       시간 초과가 난 저장소는 하루 건너뜀, 같은 대화의 작업자는 한 번에 하나만.
-import { snapshot, repoRoot, loadCheckpoints, saveCheckpoints } from './lib/checkpoint.mjs';
+import { snapshot, repoRoot, loadCheckpoints, saveCheckpoints, deleteRef } from './lib/checkpoint.mjs';
 import { logError, ID_RE, DATA_DIR, atomicWrite } from './lib/common.mjs';
-import { execFileSync } from 'node:child_process';
 import { mkdirSync, statSync, openSync, writeSync, closeSync, rmSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -62,7 +61,7 @@ try {
     if (!r) return;
     const prev = [...loadCheckpoints(conv), ...added].reverse().find((c) => c.repo === r.repo && c.kind !== 'undo');
     if (prev && prev.tree === r.tree) { // 지난 체크포인트와 내용이 같으면 생략 (방금 만든 ref 도 지움)
-      try { execFileSync('git', ['-C', r.repo, 'update-ref', '-d', `refs/agyc/${ref}`], { windowsHide: true, stdio: 'ignore', timeout: 10000 }); } catch {}
+      deleteRef(r.repo, `refs/agyc/${ref}`); // 저장소 훅(reference-transaction)이 돌지 않게 안전 설정으로
       return;
     }
     added.push({ id: `${turn}-${Date.now()}-${i}`, turn: Number(turn), at: new Date().toISOString(), repo: r.repo, commit: r.commit, tree: r.tree, ref, skipped: r.skipped.slice(0, 20), userText: String(userText).slice(0, 200) });

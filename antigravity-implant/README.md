@@ -95,12 +95,13 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1 -StatusLine
   "dangerGuard": true,
   "syntaxCheck": true,
   "folderGrants": true,
-  "folderGrantsFromCommands": true,
+  "folderGrantsFromCommands": false,
   "checkpoints": true
 }
 ```
 
-- `folderGrantsFromCommands`: 샌드박스 밖 실행(`BypassSandbox`)을 사용자가 허락해 성공한 `run_command` 에서, 그 명령의 작업 위치(`Cwd`)와 명령에 나온 실제 경로(최대 3개)의 폴더에 `write_file(<폴더>\)` 를 넣습니다. 터미널 샌드박스의 쓰기 범위가 이 규칙을 따르므로(agy CLI 로 확인), 다음부터 그 폴더 작업은 샌드박스 안에서 묻지 않고 됩니다. 폴더 허락과 같은 제외 규칙(드라이브 맨 위·홈·홈 바로 아래·AppData·점 폴더·시스템 폴더)에 더해, 실행 파일·스크립트(`.exe` `.ps1` `.py` 등)가 있는 폴더와 와일드카드 경로는 넓히지 않습니다. 샌드박스 밖 실행 자체를 자동 허락하는 규칙은 없습니다(`unsandboxed(…)` 규칙도 agy CLI 에서 듣지 않음).
+- `folderGrantsFromCommands` (기본 꺼짐): 켜면 샌드박스 밖 실행(`BypassSandbox`)을 사용자가 허락해 성공한 `run_command` 에서, 명령에 나온 실제 경로(최대 3개)의 폴더에 `write_file(<폴더>\)` 를 넣습니다. 작업 위치(`Cwd`)만으로는 넣지 않습니다. 터미널 샌드박스의 쓰기 범위가 이 규칙을 따르므로(agy CLI 로 확인), 다음부터 그 폴더 작업은 샌드박스 안에서 묻지 않고 됩니다. 경로는 `realpath` 로 진짜 위치를 구한 뒤 판단하고, 폴더 허락과 같은 제외 규칙(드라이브 맨 위·홈·홈 바로 아래·AppData·점 폴더·시스템 폴더·이상한 표기)에 더해 실행 파일·스크립트(`.exe` `.ps1` `.py` 등)가 있는 폴더와 와일드카드 경로는 넓히지 않습니다.
+- 폴더 허락(파일 도구) 경로도 진짜 위치로 바꿔 판단합니다. 끝의 점·공백, `~1` 짧은 이름, `:` 데이터 스트림, `\\?\` 접두사가 든 경로는 다른 폴더를 가리킬 수 있어 넓히지 않습니다. 샌드박스 밖 실행 자체를 자동 허락하는 규칙은 없습니다(`unsandboxed(…)` 규칙도 agy CLI 에서 듣지 않음).
 - 패널 색은 `~/.gemini/antigravity-implant/ui.json`(`theme`, `accent`)에 저장됩니다. `app` 이면 앱의 `config.json` → `userSettings.themeMode`·`customThemeSeedsDark/Light` 를 읽기만 합니다.
 
 - `remindMode`: `always` 매 호출 / `smart` 새 메시지이거나 말없는 호출이 이어질 때만 / `off`

@@ -88,6 +88,10 @@ try {
   check('토큰 없는 POST 는 거부 (다른 웹페이지의 몰래 요청 차단)', noTok.status === 401, String(noTok.status));
   const badHost = await new Promise((res) => { const rq = http.request({ host: '127.0.0.1', port, path: '/', headers: { Host: 'evil.example:' + port } }, (r) => { r.resume(); res(r.statusCode); }); rq.on('error', () => res(0)); rq.end(); });
   check('다른 호스트 이름으로 온 요청은 거부 (DNS rebinding 차단)', badHost === 403, String(badHost));
+  const xs = await fetch(`${base}/api/conversations`, { headers: { 'Sec-Fetch-Site': 'cross-site' } });
+  const xo = await fetch(`${base}/api/conversations`, { headers: { Origin: 'https://evil.example' } });
+  const so = await fetch(`${base}/api/conversations`, { headers: { 'Sec-Fetch-Site': 'same-origin', Origin: base } });
+  check('다른 사이트에서 온 /api GET 은 거부 (이미지 태그 등 몰래 요청)', xs.status === 403 && xo.status === 403 && so.ok, `${xs.status} ${xo.status} ${so.status}`);
   const page = await (await fetch(`${base}/`)).text();
   check('패널 페이지에 토큰이 들어가 preload 보다 먼저 주소에 붙음', page.indexOf('__IMPLANT_TOKEN') >= 0 && page.indexOf('__IMPLANT_TOKEN') < page.indexOf('/preload.js'), '');
   check('되돌리기 API: 빈 번호·옵션 같은 번호는 거부 (마지막 것으로 덮어쓰지 않음)', emptyId.status === 400 && dashId.status === 400, `${emptyId.status} ${dashId.status}`);
