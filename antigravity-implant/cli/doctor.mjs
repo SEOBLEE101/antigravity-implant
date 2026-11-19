@@ -111,6 +111,14 @@ for (const [f, max, why] of [
   const n = readFileSync(f, 'utf8').replace(/<!--[\s\S]*?-->/g, '').length;
   n > max ? warn('규칙', `${f.replace(HOME, '~')} 가 ${n}자 — ${why}`, '줄이기') : ok('규칙', `${f.replace(HOME, '~')} ${n}자`);
 }
+const geminiMd = join(HOME, '.gemini', 'GEMINI.md');
+if (existsSync(geminiMd)) {
+  try {
+    const rawMd = readFileSync(geminiMd, 'utf8');
+    const rm = rawMd.match(/<!--\s*antigravity-implant:readable-replies:start\s+lang=([a-zA-Z0-9_-]+)\s*-->/);
+    if (rm) ok('규칙', `읽기 쉬운 답 규칙 적용됨 (언어: ${rm[1]})`);
+  } catch {}
+}
 // 다른 플러그인 스킬이 많으면 매 대화 첫 입력이 커진다 (참고 정보)
 try {
   const pdir = join(HOME, '.gemini', 'config', 'plugins');

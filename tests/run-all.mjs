@@ -8,7 +8,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const TESTS = ['run-tests', 'features-test', 'checkpoint-test', 'folder-grants-test', 'cockpit-rewind-test', 'statusline-test', 'mesh-test'];
+const TESTS = ['run-tests', 'features-test', 'checkpoint-test', 'folder-grants-test', 'cockpit-rewind-test', 'statusline-test', 'mesh-test', 'gemini-md-test'];
 const fakeHome = mkdtempSync(join(tmpdir(), 'implant-home-'));
 mkdirSync(join(fakeHome, '.gemini', 'config'), { recursive: true });
 // 패널 시험용: 실제 앱이 깔아 둔 sidecar_sdk 위치만 알려 준다 (읽기만 함)

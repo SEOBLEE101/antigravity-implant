@@ -49,11 +49,20 @@ cd antigravity-implant
 powershell -ExecutionPolicy Bypass -File .\install.ps1 -StatusLine
 ```
 
+Optional flags:
+
+```powershell
+# Add the 10 "Readable Replies" formatting rules to ~/.gemini/GEMINI.md, auto-translated to match your settings/locale
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -StatusLine -ReadableReplies
+# Pin a specific language (built-in: ko, en, ja, zh-CN, zh-TW, es, fr, de, pt; other BCP-47 locales fall back to English rules + reply-language instruction)
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -ReadableReplies -Lang en
+```
+
 - Restart the app, then open the panel from the right-hand pane of a conversation: **`+` → Extensions → Live Cockpit** (once per conversation). The first time, check under **Customizations → antigravity-implant → UI extensions → Live Cockpit** that it says Running.
 - Health check: `/doctor` in a new conversation
-- Uninstall: `install.ps1 -Uninstall` (your data folder is kept)
+- Uninstall: `install.ps1 -Uninstall` (your data folder is kept; any `GEMINI.md` block added by `-ReadableReplies` is cleanly removed by marker)
 
-`install.ps1` validates the plugin in a temporary folder and then places it in `%USERPROFILE%\.gemini\config\plugins\`. It does not touch admin rights, the registry, permission allow-lists or the network. `-StatusLine` backs up the agy CLI settings and adds a single status-line entry.
+`install.ps1` validates the plugin in a temporary folder and then places it in `%USERPROFILE%\.gemini\config\plugins\`. It does not touch admin rights, the registry, permission allow-lists or the network. `-StatusLine` backs up the agy CLI settings and adds a single status-line entry. `-ReadableReplies` backs up `~/.gemini/GEMINI.md` to a `.bak` file before making changes and manages only its marker block (`<!-- antigravity-implant:readable-replies:start ... -->`), resolving the language in order: `-Lang` → `~/.gemini/antigravity-implant/config.json` → app `config.json` → existing `GEMINI.md` prose → `ANTIGRAVITY_LANG` / Windows display locale / `LANG`. Existing manual sections with the same heading are preserved untouched.
 
 ### Optional: desktop app control (computer use)
 
@@ -92,7 +101,7 @@ What it cannot fix: tools that do not exist inside the sandbox (for example a br
 node tests/run-all.mjs
 ```
 
-199 checks. Each run uses a temporary fake home folder, so your real `~/.gemini` is never touched. `cockpit-rewind-test` needs the `sidecar_sdk` that the Antigravity app installs and is skipped otherwise.
+273 checks. Each run uses a temporary fake home folder, so your real `~/.gemini` is never touched. `cockpit-rewind-test` needs the `sidecar_sdk` that the Antigravity app installs and is skipped otherwise.
 
 ## Why it is built this way (verified by experiment)
 

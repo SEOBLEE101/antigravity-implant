@@ -93,6 +93,8 @@ export function logError(name, e) {
 // ---------- 설정 ----------
 const DEFAULT_CONFIG = {
   enabled: true,
+  // 설치 도구(gemini-md)가 읽기 쉬운 답 규칙을 번역할 때 참고하는 언어 ("auto" | BCP-47 태그, 예: "ko", "en", "ja").
+  language: 'auto',
   // 진행률 줄. 사용자의 전역 GEMINI.md 규칙과 같은 형식.
   progressRegex: '\\d{1,3}\\s*%\\s*(순조롭게 진행중입니다|문제를 해결중입니다)',
   progressHint: '`NN% 순조롭게 진행중입니다` (막혔으면 `NN% 문제를 해결중입니다`)',
