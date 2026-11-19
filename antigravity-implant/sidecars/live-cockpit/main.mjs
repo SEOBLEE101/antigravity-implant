@@ -32,6 +32,26 @@ const MIME = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
 // 데이터 폴더·원자적 저장은 훅과 같은 코드를 쓴다 (옛 이름 폴더 자동 이전도 여기서 같이 일어남)
 const { DATA_DIR, atomicWrite } = await import(pathToFileURL(join(PLUGIN_ROOT, 'hooks', 'lib', 'common.mjs')).href);
 const { hasLocalExecConfig } = await import(pathToFileURL(join(PLUGIN_ROOT, 'hooks', 'lib', 'checkpoint.mjs')).href);
+const {
+  MESH_WAKE_DIR,
+  MESH_DAEMON_PID_FILE,
+  MACHINE_ID_RE,
+  loadMeshConfig,
+  saveMeshConfig,
+  redactMeshConfig,
+  getMeshStatus,
+  listAllSessions,
+  listLocalSessions,
+  readHistory,
+  sendMessage,
+  syncAllTransports,
+  pollFolderTransport,
+  pollRelayTransport,
+  publishFolderPresence,
+  publishRelayPresence,
+  formatPeerMessageForPrompt,
+  ensureMeshIdentity,
+} = await import(pathToFileURL(join(PLUGIN_ROOT, 'hooks', 'lib', 'mesh.mjs')).href);
 const STATE_DIR = join(DATA_DIR, 'state');
 const CP_ID_RE = /^[\w.-]{1,80}$/; // 체크포인트 번호 또는 id (빈 값·옵션처럼 생긴 값 거부)
 const LIVE_RULES = join(HOME, '.gemini', 'config', 'live_rules.md');
@@ -511,4 +531,162 @@ app.api('/api/pause', (body) => {
   return { ok: true };
 }, 'POST');
 
+// ---------- 세션 메쉬 API & 백그라운드 워커 ----------
+function isMeshDaemonFresh(maxAgeMs = 15000) {
+  try {
+    const st = statSync(MESH_DAEMON_PID_FILE);
+    let data = null;
+    try { data = JSON.parse(readFileSync(MESH_DAEMON_PID_FILE, 'utf8')); } catch {}
+    const updatedMs = data && data.updatedAt ? Date.parse(data.updatedAt) : st.mtimeMs;
+    if (!Number.isFinite(updatedMs) || (Date.now() - updatedMs) >= maxAgeMs) return false;
+    if (data && Number.isInteger(data.pid)) {
+      try { process.kill(data.pid, 0); } catch (e) { if (e && e.code === 'ESRCH') return false; }
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+let wakeBusy = false;
+function processWakeQueue() {
+  if (wakeBusy || !existsSync(MESH_WAKE_DIR)) return;
+  let files;
+  try {
+    files = readdirSync(MESH_WAKE_DIR).filter((n) => n.endsWith('.json') && !n.startsWith('.')).sort();
+  } catch { return; }
+  if (!files.length) return;
+  wakeBusy = true;
+  try {
+    for (const name of files.slice(0, 5)) {
+      const src = join(MESH_WAKE_DIR, name);
+      const taking = join(MESH_WAKE_DIR, `.${name}.taking-${process.pid}`);
+      try { renameSync(src, taking); } catch { continue; }
+      let raw = null;
+      try {
+        raw = JSON.parse(readFileSync(taking, 'utf8'));
+      } catch {
+        try { rmSync(taking, { force: true }); } catch {}
+        continue;
+      }
+      try { rmSync(taking, { force: true }); } catch {}
+      const env = (raw && raw.envelope) || raw;
+      if (!env || typeof env !== 'object' || typeof env.body !== 'string') continue;
+
+      let targetConv = String(env.deliveredTo || (env.to && env.to.conversationId) || '').trim();
+      if (!targetConv || targetConv === '_any' || targetConv === 'latest' || targetConv === '*') {
+        const locals = listLocalSessions({ limit: 20 });
+        const picked = locals.find((s) => s.isMain !== false && convDir(s.id)) || locals.find((s) => convDir(s.id));
+        targetConv = picked ? picked.id : '';
+      }
+      if (!targetConv || !convDir(targetConv)) continue;
+
+      const st = loadHookState(targetConv);
+      const invMs = st.lastInvokeAt ? Date.parse(st.lastInvokeAt) : 0;
+      if (st.turnOpen === true && Number.isFinite(invMs) && (Date.now() - invMs) < 15000) {
+        continue; // PreInvocation 훅이 이미 실행 중이거나 곧 inbox 에서 주입하므로 중복 깨우기를 생략
+      }
+      try {
+        app.sendMessage(targetConv, formatPeerMessageForPrompt(env));
+      } catch (e) {
+        console.error('[mesh-wake]', (e && e.message) || e);
+      }
+    }
+  } finally {
+    wakeBusy = false;
+  }
+}
+
+let meshSyncBusy = false;
+async function backgroundRemoteSync() {
+  if (meshSyncBusy) return;
+  const cfg = loadMeshConfig({ createIfMissing: false });
+  if (cfg.enabled === false) return;
+  const folderOn = Boolean(cfg.transports?.folder?.enabled && cfg.transports?.folder?.rootDir);
+  const relayOn = Boolean(cfg.transports?.relay?.enabled && cfg.transports?.relay?.url && cfg.transports?.relay?.secret);
+  if (!folderOn && !relayOn) return;
+  if (isMeshDaemonFresh(15000)) return;
+  meshSyncBusy = true;
+  try {
+    if (folderOn) {
+      try { publishFolderPresence(cfg); } catch {}
+      try { pollFolderTransport(cfg); } catch {}
+    }
+    if (relayOn) {
+      try { await publishRelayPresence(cfg); } catch {}
+      try { await pollRelayTransport(cfg); } catch {}
+    }
+  } finally {
+    meshSyncBusy = false;
+  }
+}
+
+app.api('/api/mesh/status', () => ({
+  ...getMeshStatus(),
+  sessions: listAllSessions(),
+  history: readHistory({ limit: 40 }),
+}), 'GET');
+
+app.api('/api/mesh/send', async (body) => {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return jsonError('잘못된 요청 형식입니다.');
+  const text = String(body.body || '').trim();
+  if (!text) return jsonError('메시지 본문이 비어 있습니다.');
+  const toMachine = body.toMachine !== undefined ? String(body.toMachine).trim() : 'local';
+  const toConversationId = body.toConversationId !== undefined ? String(body.toConversationId).trim() : 'latest';
+  if (toMachine !== 'local' && !MACHINE_ID_RE.test(toMachine)) {
+    return jsonError('대상 머신 ID 형식이 올바르지 않습니다.');
+  }
+  if (toConversationId && toConversationId !== 'latest' && toConversationId !== '*' && !ID_RE.test(toConversationId)) {
+    return jsonError('대상 세션 ID 형식이 올바르지 않습니다.');
+  }
+  const transport = body.transport !== undefined ? String(body.transport).trim() : 'auto';
+  if (!['auto', 'local', 'http', 'relay', 'folder'].includes(transport)) {
+    return jsonError('지원하지 않는 전송 통로입니다.');
+  }
+  let res;
+  try {
+    res = await sendMessage({
+      fromConversationId: body.fromConversationId ? String(body.fromConversationId).trim() : '',
+      fromTitle: body.fromTitle ? String(body.fromTitle).trim() : '',
+      toMachine,
+      toConversationId: toConversationId || 'latest',
+      subject: body.subject !== undefined ? String(body.subject) : '',
+      body: String(body.body),
+      kind: body.kind ? String(body.kind) : 'note',
+      threadId: body.threadId ? String(body.threadId) : undefined,
+      wake: body.wake !== false,
+      transport,
+    });
+  } catch (e) {
+    return jsonError((e && e.message) || '전송 검증 실패', 400);
+  }
+  if (!res || !res.ok) {
+    return new Response(JSON.stringify(res || { ok: false, error: '전송 실패' }), { status: 502, contentType: 'application/json' });
+  }
+  return res;
+}, 'POST');
+
+app.api('/api/mesh/sync', async () => {
+  try {
+    ensureMeshIdentity();
+    return await syncAllTransports();
+  } catch (e) {
+    return jsonError((e && e.message) || '동기화 실패', 502);
+  }
+}, 'POST');
+
+app.api('/api/mesh/config', (body) => {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return jsonError('설정은 JSON 객체여야 합니다.');
+  }
+  try {
+    const saved = saveMeshConfig(body);
+    return { ok: true, config: redactMeshConfig(saved) };
+  } catch (e) {
+    return jsonError((e && e.message) || '설정 저장 실패', 400);
+  }
+}, 'POST');
+
 app.run();
+setInterval(processWakeQueue, 2500).unref();
+setInterval(() => { backgroundRemoteSync().catch(() => {}); }, 15000).unref();

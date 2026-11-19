@@ -309,10 +309,13 @@
     display: flex;
     align-items: center;
     gap: 2px;
-    padding: 0 18px 0 12px;
+    padding: 0 0 0 12px;
     overflow-x: auto;
     scrollbar-width: none;
-    scroll-snap-type: x proximity;
+  }
+  nav::after {
+    content: "";
+    flex: 0 0 18px;
   }
   nav::-webkit-scrollbar { display: none; }
   nav button {
@@ -1227,6 +1230,222 @@
   #sendState { font-size: 11px; margin-top: 5px; padding: 0 2px; min-height: 15px; line-height: 1.35; color: var(--lc-muted); }
   #sendState:empty { display: none; }
 
+  /* ----- 세션 메쉬 탭 (#p-mesh) ----- */
+  .mesh-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .mesh-status-card {
+    border: 1px solid var(--lc-line);
+    border-radius: var(--lc-r);
+    background: var(--lc-surface);
+    padding: 9px 10px;
+    min-width: 0;
+  }
+  .mesh-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .mesh-chips {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+  .mesh-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 7px;
+    border-radius: 6px;
+    border: 1px solid var(--lc-line);
+    background: var(--lc-bg);
+    color: var(--lc-muted);
+    font-size: 11px;
+    line-height: 1.4;
+    white-space: nowrap;
+  }
+  .mesh-chip .mesh-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--lc-muted);
+    flex: none;
+  }
+  .mesh-chip.is-on {
+    color: var(--lc-fg);
+    border-color: color-mix(in srgb, var(--lc-ok) 45%, var(--lc-line));
+    background: color-mix(in srgb, var(--lc-ok) 10%, var(--lc-surface));
+  }
+  .mesh-chip.is-on .mesh-dot { background: var(--lc-ok); }
+  .mesh-meta {
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--lc-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    overflow-wrap: anywhere;
+  }
+  .mesh-composer {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .mesh-field-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+  .mesh-input,
+  .mesh-textarea {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    font: inherit;
+    font-size: 12px;
+    padding: 6px 9px;
+    border-radius: 6px;
+    border: 1px solid var(--lc-line);
+    background: var(--lc-bg);
+    color: var(--lc-fg);
+  }
+  .mesh-input::placeholder,
+  .mesh-textarea::placeholder { color: var(--lc-muted); opacity: 1; }
+  .mesh-textarea {
+    min-height: 66px;
+    line-height: 1.45;
+    resize: vertical;
+  }
+  .mesh-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .mesh-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    color: var(--lc-fg);
+    cursor: pointer;
+  }
+  .mesh-check input[type="checkbox"] {
+    margin: 0;
+    accent-color: var(--lc-accent);
+    cursor: pointer;
+  }
+  .mesh-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .mesh-msg-head {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+    font-size: 11px;
+    color: var(--lc-muted);
+    margin-bottom: 4px;
+    overflow-wrap: anywhere;
+  }
+  .mesh-dir {
+    font: 600 10px var(--lc-mono);
+    padding: 1px 5px;
+    border-radius: 4px;
+    border: 1px solid var(--lc-line);
+    background: var(--lc-surface-2);
+    color: var(--lc-fg);
+  }
+  .mesh-dir.is-in {
+    border-color: color-mix(in srgb, var(--lc-ok) 45%, transparent);
+    background: color-mix(in srgb, var(--lc-ok) 12%, var(--lc-surface));
+    color: var(--lc-ok);
+  }
+  .mesh-tr {
+    font-size: 10.5px;
+    padding: 1px 5px;
+    border-radius: 4px;
+    border: 1px solid var(--lc-line);
+    background: var(--lc-bg);
+    color: var(--lc-muted);
+  }
+  .mesh-subject {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--lc-fg);
+    margin-bottom: 3px;
+    overflow-wrap: anywhere;
+    user-select: text;
+  }
+  .mesh-settings .mesh-cfg-body {
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    border-top: 1px solid var(--lc-line);
+  }
+  .mesh-cfg-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--lc-line);
+    min-width: 0;
+  }
+  .mesh-cfg-group:last-of-type {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+  .mesh-cfg-title {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--lc-fg);
+  }
+  .mesh-label {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 11px;
+    color: var(--lc-muted);
+    flex: 1 1 130px;
+    min-width: 0;
+  }
+  .mesh-peer-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 5px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--lc-line);
+    background: var(--lc-bg);
+    font-size: 11px;
+    min-width: 0;
+  }
+  .mesh-peer-info {
+    min-width: 0;
+    flex: 1;
+    overflow-wrap: anywhere;
+    user-select: text;
+  }
+  #meshSendState, #meshCfgState { overflow-wrap: anywhere; user-select: text; }
+
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
       animation: none !important;
@@ -1305,6 +1524,7 @@
       <button role="tab" aria-selected="false" data-tab="rewind">되돌리기</button>
       <button role="tab" aria-selected="false" data-tab="rules">실시간 규칙</button>
       <button role="tab" aria-selected="false" data-tab="hooks">훅 기록</button>
+      <button role="tab" aria-selected="false" data-tab="mesh">세션 <span id="meshCount" class="muted"></span></button>
     </nav>
   </div>
 </header>
@@ -1368,6 +1588,118 @@
   <section id="tab-hooks" hidden>
     <p class="muted">Antigravity Implant 훅이 이 대화에서 한 일입니다. 비어 있으면 훅이 아직 안 돌았거나 꺼져 있습니다.</p>
     <div id="hooks"></div>
+  </section>
+  <section id="tab-mesh" hidden>
+    <div id="p-mesh" class="mesh-panel">
+      <div class="mesh-status-card">
+        <div class="mesh-bar">
+          <div id="meshTransportChips" class="mesh-chips">
+            <span class="mesh-chip" data-tr="local"><span class="mesh-dot"></span>로컬</span>
+            <span class="mesh-chip" data-tr="http"><span class="mesh-dot"></span>Tailscale</span>
+            <span class="mesh-chip" data-tr="folder"><span class="mesh-dot"></span>공유 폴더</span>
+            <span class="mesh-chip" data-tr="relay"><span class="mesh-dot"></span>중계</span>
+          </div>
+          <button type="button" class="btn" id="meshSyncBtn">동기화</button>
+        </div>
+        <div id="meshMeta" class="mesh-meta">불러오는 중…</div>
+      </div>
+
+      <div class="item mesh-composer">
+        <div class="mesh-field-row">
+          <select id="meshTargetSelect" aria-label="대상 세션 선택" style="flex:1 1 190px;min-width:0;"></select>
+          <select id="meshTransportSelect" aria-label="전송 통로 선택" style="flex:0 1 105px;min-width:0;">
+            <option value="auto">자동 경로</option>
+            <option value="local">로컬</option>
+            <option value="http">Tailscale</option>
+            <option value="folder">공유 폴더</option>
+            <option value="relay">중계</option>
+          </select>
+        </div>
+        <div id="meshManualRow" class="mesh-field-row" hidden>
+          <input type="text" id="meshToMachine" class="mesh-input" style="flex:1 1 120px;" placeholder="대상 머신 ID (예: local)" autocomplete="off">
+          <input type="text" id="meshToConv" class="mesh-input" style="flex:1 1 150px;" placeholder="세션 ID (latest, *, UUID)" autocomplete="off">
+        </div>
+        <input type="text" id="meshSubject" class="mesh-input" maxlength="120" placeholder="제목 (선택)" autocomplete="off">
+        <textarea id="meshBody" class="mesh-textarea" rows="3" placeholder="다른 세션에 보낼 메시지…"></textarea>
+        <div class="mesh-actions">
+          <label class="mesh-check"><input type="checkbox" id="meshWake" checked> 유휴 세션 깨우기</label>
+          <button type="button" class="btn primary" id="meshSendBtn">전송</button>
+        </div>
+        <div id="meshSendState" class="muted" style="font-size:11px"></div>
+      </div>
+
+      <h3>최근 세션 메시지</h3>
+      <div id="meshTimeline" class="mesh-timeline">
+        <div class="empty muted">아직 주고받은 세션 메시지가 없습니다</div>
+      </div>
+
+      <details class="file mesh-settings" id="meshSettingsDetails">
+        <summary>연결 설정 · 머신 ID · 원격 통로</summary>
+        <div class="mesh-cfg-body">
+          <div class="mesh-cfg-group">
+            <div class="mesh-cfg-title">내 머신 신원</div>
+            <div class="mesh-field-row">
+              <label class="mesh-label">머신 ID
+                <input type="text" id="meshCfgMachineId" class="mesh-input" autocomplete="off" spellcheck="false">
+              </label>
+              <label class="mesh-label">표시 이름
+                <input type="text" id="meshCfgDisplayName" class="mesh-input" autocomplete="off">
+              </label>
+            </div>
+            <label class="mesh-label">로컬 머신 비밀키 (변경 시만 입력)
+              <input type="password" id="meshCfgSecret" class="mesh-input" autocomplete="new-password" placeholder="미설정">
+            </label>
+          </div>
+
+          <div class="mesh-cfg-group">
+            <label class="mesh-check"><input type="checkbox" id="meshCfgFolderEnabled"> Google Drive / 공유 폴더 우체통 사용</label>
+            <label class="mesh-label">공유 폴더 경로
+              <input type="text" id="meshCfgFolderRoot" class="mesh-input" placeholder="예: G:\내 드라이브\AntigravityMesh" autocomplete="off" spellcheck="false">
+            </label>
+          </div>
+
+          <div class="mesh-cfg-group">
+            <label class="mesh-check"><input type="checkbox" id="meshCfgHttpEnabled"> Tailscale / LAN HTTP 피어 사용</label>
+            <div class="mesh-field-row">
+              <label class="mesh-label">바인드 호스트
+                <input type="text" id="meshCfgHttpBindHost" class="mesh-input" placeholder="127.0.0.1" autocomplete="off" spellcheck="false">
+              </label>
+              <label class="mesh-label" style="flex:0 1 90px;">포트
+                <input type="number" id="meshCfgHttpPort" class="mesh-input" min="1024" max="65535" placeholder="47821">
+              </label>
+            </div>
+            <label class="mesh-label">내 광고 URL (선택)
+              <input type="text" id="meshCfgHttpAdvertiseUrl" class="mesh-input" placeholder="http://100.x.x.x:47821" autocomplete="off" spellcheck="false">
+            </label>
+            <div id="meshPeerList" style="display:flex;flex-direction:column;gap:4px;"></div>
+            <div class="mesh-cfg-title" style="margin-top:2px;font-size:11px;color:var(--lc-muted);">Tailscale HTTP 피어 추가</div>
+            <div class="mesh-field-row">
+              <input type="text" id="meshPeerId" class="mesh-input" style="flex:1 1 110px;" placeholder="피어 machineId" autocomplete="off" spellcheck="false">
+              <input type="text" id="meshPeerUrl" class="mesh-input" style="flex:1 1 150px;" placeholder="http://100.x.x.x:47821" autocomplete="off" spellcheck="false">
+            </div>
+            <div class="mesh-field-row">
+              <input type="password" id="meshPeerSecret" class="mesh-input" style="flex:1 1 140px;" placeholder="피어 비밀키" autocomplete="new-password">
+              <button type="button" class="btn" id="meshAddPeerBtn">피어 추가</button>
+            </div>
+          </div>
+
+          <div class="mesh-cfg-group">
+            <label class="mesh-check"><input type="checkbox" id="meshCfgRelayEnabled"> 클라우드 중계 서버 사용</label>
+            <label class="mesh-label">중계 서버 URL
+              <input type="text" id="meshCfgRelayUrl" class="mesh-input" placeholder="https://your-worker.workers.dev" autocomplete="off" spellcheck="false">
+            </label>
+            <label class="mesh-label">중계 비밀키
+              <input type="password" id="meshCfgRelaySecret" class="mesh-input" autocomplete="new-password" placeholder="중계 비밀키 입력">
+            </label>
+          </div>
+
+          <div class="row" style="justify-content:space-between;">
+            <button type="button" class="btn primary" id="meshSaveCfgBtn">설정 저장</button>
+            <span id="meshCfgState" class="muted" style="font-size:11px;"></span>
+          </div>
+        </div>
+      </details>
+    </div>
   </section>
 </main>
 
@@ -1436,15 +1768,24 @@
 
   // ----- 탭 전환 및 키보드 내비게이션 -----
   const tabBtns = Array.from(document.querySelectorAll('nav button[role="tab"]'));
+  function scrollTabIntoView(target) {
+    const navEl = target && target.parentElement;
+    if (!navEl) return;
+    if (target === tabBtns[tabBtns.length - 1]) navEl.scrollLeft = navEl.scrollWidth;
+    else if (target === tabBtns[0]) navEl.scrollLeft = 0;
+    else target.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+  }
   function activateTab(tabName) {
     const target = tabBtns.find((x) => x.dataset.tab === tabName);
     if (!target) return;
     tabBtns.forEach((x) => x.setAttribute('aria-selected', String(x === target)));
     document.querySelectorAll('main section').forEach((s) => { s.hidden = s.id !== 'tab-' + tabName; });
-    target.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+    if (tabName !== 'flow') $('main').scrollTop = 0;
+    scrollTabIntoView(target);
     if (tabName === 'rules') loadRules();
     if (tabName === 'diff') loadDiff();
     if (tabName === 'rewind') loadCheckpoints();
+    if (tabName === 'mesh') loadMesh();
   }
   tabBtns.forEach((b, idx) => {
     b.addEventListener('click', () => activateTab(b.dataset.tab));
@@ -2011,7 +2352,8 @@
     if (sig === lastFlowSig) return;
     lastFlowSig = sig;
     const main = $('main');
-    const nearBottom = main.scrollTop + main.clientHeight >= main.scrollHeight - 80;
+    const flowActive = !$('tab-flow').hidden;
+    const nearBottom = flowActive && (main.scrollTop + main.clientHeight >= main.scrollHeight - 80);
     const html = (data.steps || []).filter((s) => s.kind !== 'other').map((s) => {
       if (s.kind === 'user') return `<div class="item user"><div class="who">사용자</div><div class="text">${inlineMd(s.text)}</div></div>`;
       if (s.kind === 'model') {
@@ -2152,9 +2494,367 @@
   $('msg').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) send($('msg').value); });
   document.querySelectorAll('.presets button').forEach((b) => b.addEventListener('click', () => send(b.dataset.msg)));
 
+  // ----- 세션 메쉬 (로컬·원격 세션 대화) -----
+  let meshData = null;
+  let meshLoading = false;
+  let meshCfgDirty = false;
+  let meshLastSig = '';
+  const TR_LABELS = { local: '로컬', http: 'Tailscale', folder: '공유 폴더', relay: '중계' };
+
+  function syncManualRow() {
+    const manual = $('meshTargetSelect').value === '__manual__';
+    $('meshManualRow').hidden = !manual;
+  }
+
+  function renderMeshTargetOptions(st) {
+    const sel = $('meshTargetSelect');
+    const prev = sel.value;
+    const cfg = (st && st.config) || {};
+    const sessions = (st && Array.isArray(st.sessions)) ? st.sessions : [];
+    const opts = [{ v: 'local::latest', label: '현재 머신 · 최근 메인 세션 (latest)' }];
+    const seen = new Set(['local::latest']);
+
+    for (const s of sessions) {
+      if (!s || !s.id) continue;
+      const m = s.local ? 'local' : s.machineId;
+      if (!m) continue;
+      const val = m + '::' + s.id;
+      if (seen.has(val)) continue;
+      seen.add(val);
+      const tag = s.local ? '로컬' : (s.displayName || s.machineId);
+      const title = s.title || s.id.slice(0, 8);
+      const curMark = s.id === curConv() ? ' (현재)' : '';
+      const staleMark = s.stale ? ' · 오래됨' : '';
+      opts.push({ v: val, label: `[${tag}] ${title} · ${s.id.slice(0, 8)}${curMark}${staleMark}` });
+    }
+
+    const peers = (cfg.transports && cfg.transports.http && cfg.transports.http.peers) || {};
+    for (const [peerId, pInfo] of Object.entries(peers)) {
+      const val = peerId + '::latest';
+      if (seen.has(val)) continue;
+      seen.add(val);
+      opts.push({ v: val, label: `[${(pInfo && pInfo.displayName) || peerId}] 최근 세션 (latest)` });
+    }
+
+    opts.push({ v: '__manual__', label: '직접 머신/세션 ID 입력…' });
+    sel.innerHTML = opts.map((o) => `<option value="${esc(o.v)}">${esc(o.label)}</option>`).join('');
+    if (prev && opts.some((o) => o.v === prev)) sel.value = prev;
+    else sel.value = 'local::latest';
+    syncManualRow();
+  }
+
+  function renderMeshTimeline(st) {
+    const list = (st && Array.isArray(st.history)) ? st.history : [];
+    const box = $('meshTimeline');
+    if (!list.length) {
+      box.innerHTML = '<div class="empty muted">아직 주고받은 세션 메시지가 없습니다</div>';
+      return;
+    }
+    box.innerHTML = list.map((it) => {
+      const isIn = it.direction === 'in';
+      const fromM = (it.from && it.from.machineId) || '?';
+      const fromC = (it.from && it.from.conversationId) ? '/' + it.from.conversationId.slice(0, 8) : '';
+      const toM = (it.to && it.to.machineId) || '?';
+      const toC = (it.to && it.to.conversationId) ? '/' + it.to.conversationId.slice(0, 8) : '';
+      const tr = TR_LABELS[it.transport] || it.transport || 'local';
+      const whenTxt = it.ts ? ago(Date.now() - when(it.ts)) : '';
+      const subj = it.subject ? `<div class="mesh-subject">${esc(it.subject)}</div>` : '';
+      const replyBtn = isIn && fromM && fromM !== '?'
+        ? `<button type="button" class="btn mesh-reply" data-m="${esc(fromM)}" data-c="${esc((it.from && it.from.conversationId) || 'latest')}" data-s="${esc(it.subject || '')}" style="margin-left:auto;">답장</button>`
+        : '';
+      return `<div class="item">
+        <div class="mesh-msg-head">
+          <span class="mesh-dir ${isIn ? 'is-in' : ''}">${isIn ? 'IN' : 'OUT'}</span>
+          <span>${esc(fromM + fromC)} → ${esc(toM + toC)}</span>
+          <span class="mesh-tr">${esc(tr)}</span>
+          <span class="muted">${esc(whenTxt)}</span>
+          ${replyBtn}
+        </div>
+        ${subj}
+        <div class="text">${esc(it.body || '')}</div>
+      </div>`;
+    }).join('');
+    box.querySelectorAll('.mesh-reply').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const m = btn.dataset.m === (st && st.machineId) ? 'local' : btn.dataset.m;
+        const c = btn.dataset.c || 'latest';
+        const val = m + '::' + c;
+        const sel = $('meshTargetSelect');
+        if (Array.from(sel.options).some((o) => o.value === val)) {
+          sel.value = val;
+        } else {
+          sel.value = '__manual__';
+          $('meshToMachine').value = m;
+          $('meshToConv').value = c;
+        }
+        syncManualRow();
+        if (btn.dataset.s && !$('meshSubject').value) $('meshSubject').value = 'Re: ' + btn.dataset.s;
+        $('meshBody').focus();
+      });
+    });
+  }
+
+  function renderMeshConfigForm(st, force = false) {
+    const cfg = (st && st.config) || {};
+    const tr = cfg.transports || {};
+    const details = $('meshSettingsDetails');
+    if (!force && (meshCfgDirty || details.contains(document.activeElement))) return;
+
+    $('meshCfgMachineId').value = cfg.machineId || st.machineId || '';
+    $('meshCfgDisplayName').value = cfg.displayName || st.displayName || '';
+    $('meshCfgSecret').value = '';
+    $('meshCfgSecret').placeholder = cfg.secretConfigured ? '저장됨 (변경 시만 입력)' : '미설정 (저장 시 자동 생성)';
+
+    const folder = tr.folder || {};
+    $('meshCfgFolderEnabled').checked = Boolean(folder.enabled);
+    $('meshCfgFolderRoot').value = folder.rootDir || '';
+
+    const httpCfg = tr.http || {};
+    $('meshCfgHttpEnabled').checked = Boolean(httpCfg.enabled);
+    $('meshCfgHttpBindHost').value = httpCfg.bindHost || '127.0.0.1';
+    $('meshCfgHttpPort').value = httpCfg.port || 47821;
+    $('meshCfgHttpAdvertiseUrl').value = httpCfg.advertiseUrl || '';
+
+    const peers = httpCfg.peers || {};
+    const peerEntries = Object.entries(peers);
+    $('meshPeerList').innerHTML = peerEntries.map(([pid, p]) => `
+      <div class="mesh-peer-row">
+        <div class="mesh-peer-info"><b>${esc(pid)}</b> · ${esc((p && p.url) || 'URL 없음')} <span class="muted">(${p && p.secretConfigured ? '비밀키 저장됨' : '미설정'})</span></div>
+        <button type="button" class="btn mesh-peer-del" data-peer="${esc(pid)}">삭제</button>
+      </div>`).join('');
+    $('meshPeerList').querySelectorAll('.mesh-peer-del').forEach((b) => {
+      b.addEventListener('click', async () => {
+        const pid = b.dataset.peer;
+        $('meshCfgState').textContent = '피어 삭제 중…';
+        try {
+          const r = await api('/api/mesh/config', { method: 'POST', body: JSON.stringify({ transports: { http: { peers: { [pid]: null } } } }) });
+          $('meshCfgState').textContent = r.ok ? `✓ 피어 ${pid} 삭제됨` : '삭제 실패: ' + (r.error || '');
+          meshCfgDirty = false;
+          await loadMesh(true);
+        } catch (e) { $('meshCfgState').textContent = '삭제 실패: ' + e.message; }
+      });
+    });
+
+    const relay = tr.relay || {};
+    $('meshCfgRelayEnabled').checked = Boolean(relay.enabled);
+    $('meshCfgRelayUrl').value = relay.url || '';
+    $('meshCfgRelaySecret').value = '';
+    $('meshCfgRelaySecret').placeholder = relay.secretConfigured ? '저장됨 (변경 시만 입력)' : '중계 비밀키 입력';
+  }
+
+  function renderMesh(st, forceCfg = false) {
+    meshData = st;
+    const cfg = (st && st.config) || {};
+    const tr = cfg.transports || {};
+    const onMap = {
+      local: !tr.local || tr.local.enabled !== false,
+      http: Boolean(tr.http && tr.http.enabled),
+      folder: Boolean(tr.folder && tr.folder.enabled && tr.folder.rootDir),
+      relay: Boolean(tr.relay && tr.relay.enabled && tr.relay.url && tr.relay.secretConfigured),
+    };
+    $('meshTransportChips').querySelectorAll('.mesh-chip').forEach((c) => {
+      c.classList.toggle('is-on', Boolean(onMap[c.dataset.tr]));
+    });
+
+    const sessions = Array.isArray(st.sessions) ? st.sessions : [];
+    $('meshCount').textContent = sessions.length ? '(' + sessions.length + ')' : '';
+    if (!$('tab-mesh').hidden) {
+      const meshTabBtn = tabBtns.find((b) => b.dataset.tab === 'mesh');
+      if (meshTabBtn) scrollTabIntoView(meshTabBtn);
+    }
+    const metaParts = [
+      `내 머신: ${st.machineId || '?'}`,
+      st.daemonAlive ? '데몬 실행 중' : '경량 동기화',
+      `세션 ${sessions.length}개`,
+    ];
+    if (st.pendingInboxCount) metaParts.push(`대기 ${st.pendingInboxCount}건`);
+    $('meshMeta').textContent = metaParts.join(' · ');
+
+    const sig = JSON.stringify({ s: sessions, h: st.history, c: cfg, p: st.pendingInboxCount, d: st.daemonAlive });
+    if (sig !== meshLastSig || forceCfg) {
+      meshLastSig = sig;
+      renderMeshTargetOptions(st);
+      renderMeshTimeline(st);
+      renderMeshConfigForm(st, forceCfg);
+    }
+  }
+
+  async function loadMesh(forceCfg = false) {
+    if (meshLoading) return;
+    meshLoading = true;
+    try {
+      const r = await api('/api/mesh/status');
+      if (r && r.machineId) renderMesh(r, forceCfg);
+    } catch (e) {
+      $('meshMeta').textContent = '메쉬 상태 불러오기 실패: ' + (e.message || e);
+    } finally {
+      meshLoading = false;
+    }
+  }
+
+  $('meshTargetSelect').addEventListener('change', syncManualRow);
+  $('meshSettingsDetails').querySelectorAll('input').forEach((el) => {
+    if (el.id === 'meshPeerId' || el.id === 'meshPeerUrl' || el.id === 'meshPeerSecret') return;
+    el.addEventListener('input', () => { meshCfgDirty = true; });
+    el.addEventListener('change', () => { meshCfgDirty = true; });
+  });
+
+  $('meshSendBtn').addEventListener('click', async () => {
+    const bodyText = $('meshBody').value;
+    if (!String(bodyText || '').trim()) {
+      $('meshSendState').textContent = '메시지 본문을 입력하세요.';
+      return;
+    }
+    let toMachine = 'local';
+    let toConversationId = 'latest';
+    const selVal = $('meshTargetSelect').value;
+    if (selVal === '__manual__') {
+      toMachine = ($('meshToMachine').value || 'local').trim();
+      toConversationId = ($('meshToConv').value || 'latest').trim();
+    } else if (selVal.includes('::')) {
+      const idx = selVal.indexOf('::');
+      toMachine = selVal.slice(0, idx) || 'local';
+      toConversationId = selVal.slice(idx + 2) || 'latest';
+    }
+    const btn = $('meshSendBtn');
+    btn.disabled = true;
+    $('meshSendState').textContent = '전송 중…';
+    try {
+      const r = await api('/api/mesh/send', {
+        method: 'POST',
+        body: JSON.stringify({
+          fromConversationId: curConv(),
+          toMachine,
+          toConversationId,
+          subject: $('meshSubject').value.trim(),
+          body: bodyText,
+          wake: $('meshWake').checked,
+          transport: $('meshTransportSelect').value || 'auto',
+        }),
+      });
+      if (r && r.ok) {
+        $('meshBody').value = '';
+        $('meshSubject').value = '';
+        $('meshSendState').textContent = `✓ 전송 완료 (${TR_LABELS[r.transport] || r.transport || 'local'} · ${String(r.id || '').slice(0, 8)})`;
+        await loadMesh();
+      } else {
+        $('meshSendState').textContent = '전송 실패: ' + ((r && r.error) || '알 수 없는 오류');
+      }
+    } catch (e) {
+      $('meshSendState').textContent = '전송 실패: ' + (e.message || e);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  $('meshSyncBtn').addEventListener('click', async () => {
+    const btn = $('meshSyncBtn');
+    btn.disabled = true;
+    $('meshSendState').textContent = '원격 통로 동기화 중…';
+    try {
+      const r = await api('/api/mesh/sync', { method: 'POST', body: JSON.stringify({}) });
+      await loadMesh();
+      if (r && r.ok) {
+        const res = r.results || {};
+        const errs = Object.entries(res).filter(([, v]) => v && v.ok === false).map(([k, v]) => `${k}: ${v.error || '실패'}`);
+        $('meshSendState').textContent = errs.length ? '동기화 일부 실패 — ' + errs.join(', ') : '✓ 원격 통로 동기화 완료';
+      } else {
+        $('meshSendState').textContent = '동기화 실패: ' + ((r && r.error) || '');
+      }
+    } catch (e) {
+      $('meshSendState').textContent = '동기화 실패: ' + (e.message || e);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  $('meshAddPeerBtn').addEventListener('click', async () => {
+    const pid = $('meshPeerId').value.trim();
+    const purl = $('meshPeerUrl').value.trim();
+    const psec = $('meshPeerSecret').value.trim();
+    if (!pid || !purl) {
+      $('meshCfgState').textContent = '피어 machineId와 URL을 모두 입력하세요.';
+      return;
+    }
+    const peerPatch = { url: purl };
+    if (psec) peerPatch.secret = psec;
+    $('meshCfgState').textContent = '피어 저장 중…';
+    try {
+      const r = await api('/api/mesh/config', {
+        method: 'POST',
+        body: JSON.stringify({ transports: { http: { enabled: true, peers: { [pid]: peerPatch } } } }),
+      });
+      if (r && r.ok) {
+        $('meshPeerId').value = '';
+        $('meshPeerUrl').value = '';
+        $('meshPeerSecret').value = '';
+        $('meshCfgState').textContent = `✓ 피어 ${pid} 추가됨`;
+        meshCfgDirty = false;
+        await loadMesh(true);
+      } else {
+        $('meshCfgState').textContent = '피어 추가 실패: ' + ((r && r.error) || '');
+      }
+    } catch (e) {
+      $('meshCfgState').textContent = '피어 추가 실패: ' + (e.message || e);
+    }
+  });
+
+  $('meshSaveCfgBtn').addEventListener('click', async () => {
+    const portNum = Number($('meshCfgHttpPort').value || 47821);
+    const patch = {
+      machineId: $('meshCfgMachineId').value.trim(),
+      displayName: $('meshCfgDisplayName').value.trim(),
+      transports: {
+        folder: {
+          enabled: $('meshCfgFolderEnabled').checked,
+          rootDir: $('meshCfgFolderRoot').value.trim(),
+        },
+        http: {
+          enabled: $('meshCfgHttpEnabled').checked,
+          bindHost: $('meshCfgHttpBindHost').value.trim() || '127.0.0.1',
+          port: Number.isFinite(portNum) ? portNum : 47821,
+          advertiseUrl: $('meshCfgHttpAdvertiseUrl').value.trim(),
+        },
+        relay: {
+          enabled: $('meshCfgRelayEnabled').checked,
+          url: $('meshCfgRelayUrl').value.trim(),
+        },
+      },
+    };
+    const topSec = $('meshCfgSecret').value.trim();
+    if (topSec) patch.secret = topSec;
+    const relaySec = $('meshCfgRelaySecret').value.trim();
+    if (relaySec) patch.transports.relay.secret = relaySec;
+
+    $('meshCfgState').textContent = '설정 저장 중…';
+    try {
+      const r = await api('/api/mesh/config', { method: 'POST', body: JSON.stringify(patch) });
+      if (r && r.ok) {
+        $('meshCfgSecret').value = '';
+        $('meshCfgRelaySecret').value = '';
+        meshCfgDirty = false;
+        $('meshCfgState').textContent = '✓ 연결 설정 저장됨';
+        await loadMesh(true);
+      } else {
+        $('meshCfgState').textContent = '저장 실패: ' + ((r && r.error) || '');
+      }
+    } catch (e) {
+      $('meshCfgState').textContent = '저장 실패: ' + (e.message || e);
+    }
+  });
+
+  const initTab = params.get('tab') || (location.hash ? location.hash.slice(1) : '');
+  if (initTab && tabBtns.some((b) => b.dataset.tab === initTab)) activateTab(initTab);
+  window.addEventListener('hashchange', () => {
+    const h = location.hash ? location.hash.slice(1) : '';
+    if (h && tabBtns.some((b) => b.dataset.tab === h)) activateTab(h);
+  });
+
   loadPicker().catch(() => {});
+  loadMesh().catch(() => {});
   tick();
   setInterval(tick, 1500);
+  setInterval(() => { if (!$('tab-mesh').hidden) loadMesh(); }, 5000);
 })();
 </script>
 </body>

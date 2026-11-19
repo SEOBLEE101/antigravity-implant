@@ -132,6 +132,71 @@ const cuReg = mcp && mcp.mcpServers && Object.keys(mcp.mcpServers).some((k) => /
 if (cuReg) existsSync(cuPy) || !JSON.stringify(mcp).includes('windows-computer-use-mcp') ? ok('computer-use', 'MCP 등록됨') : bad('computer-use', 'MCP 는 등록됐지만 파이썬 환경이 없습니다', 'install-computer-use 스크립트 다시 실행');
 else warn('computer-use', '데스크톱 조작 MCP 가 없습니다(선택 사항)', 'README 의 「computer-use 설치(선택)」');
 
+// 9) 세션 메쉬
+const MESH_DATA = process.env.ANTIGRAVITY_IMPLANT_DATA_DIR || DATA_DIR;
+const meshMcpFile = join(HOOK_ROOT, 'mcp_config.json');
+if (!existsSync(meshMcpFile)) {
+  warn('세션 메쉬', `mcp_config.json 없음 (${meshMcpFile})`, existsSync(join(PLUGIN_ROOT, 'mcp_config.json')) ? '플러그인 다시 복사 필요' : undefined);
+} else {
+  const meshMcp = readJson(meshMcpFile);
+  if (!meshMcp || typeof meshMcp !== 'object' || Array.isArray(meshMcp)) {
+    bad('세션 메쉬', `${meshMcpFile} 이 올바른 JSON 객체가 아닙니다`, 'JSON 문법 확인');
+  } else if (meshMcp.mcpServers && meshMcp.mcpServers['session-bridge']) {
+    ok('세션 메쉬', 'mcp_config.json 정상 (session-bridge 등록)');
+  } else {
+    warn('세션 메쉬', 'mcp_config.json 에 session-bridge 서버가 없습니다', 'mcp_config.json 확인');
+  }
+}
+
+const bridgeScript = join(HOOK_ROOT, 'mcp', 'session-bridge.mjs');
+if (!existsSync(bridgeScript)) {
+  bad('세션 메쉬', `mcp/session-bridge.mjs 없음 (${bridgeScript})`, '플러그인 파일 확인');
+} else {
+  run(process.execPath, ['--check', bridgeScript]) === null
+    ? bad('세션 메쉬', 'mcp/session-bridge.mjs 문법 오류', `node --check "${bridgeScript}"`)
+    : ok('세션 메쉬', 'mcp/session-bridge.mjs 정상');
+}
+
+const meshFile = join(MESH_DATA, 'mesh.json');
+if (!existsSync(meshFile)) {
+  ok('세션 메쉬', 'mesh.json 없음 (로컬 기본값 사용 — 원격 연결 시 `node cli/mesh.mjs init` 실행)');
+} else {
+  const meshCfg = readJson(meshFile);
+  if (!meshCfg || typeof meshCfg !== 'object' || Array.isArray(meshCfg)) {
+    bad('세션 메쉬', `${meshFile} 이 올바른 JSON 객체가 아닙니다`, 'JSON 문법 확인');
+  } else {
+    const tr = meshCfg.transports && typeof meshCfg.transports === 'object' ? meshCfg.transports : {};
+    const active = [];
+    if (!tr.local || tr.local.enabled !== false) active.push('로컬');
+    if (tr.http && tr.http.enabled) {
+      const peerCount = tr.http.peers && typeof tr.http.peers === 'object' ? Object.keys(tr.http.peers).length : 0;
+      active.push(`Tailscale/HTTP(${tr.http.bindHost || '127.0.0.1'}:${tr.http.port || 47821}, 피어 ${peerCount}대)`);
+    }
+    if (tr.folder && tr.folder.enabled) {
+      active.push(`공유 폴더(${tr.folder.rootDir ? '경로 지정됨' : '경로 미지정'})`);
+    }
+    if (tr.relay && tr.relay.enabled) {
+      active.push(`중계(${tr.relay.url ? tr.relay.url : 'URL 미지정'})`);
+    }
+    const idLabel = typeof meshCfg.machineId === 'string' && meshCfg.machineId ? meshCfg.machineId : '미지정';
+    const hasSecret = Boolean(typeof meshCfg.secret === 'string' && meshCfg.secret.trim());
+    if (meshCfg.enabled === false) {
+      warn('세션 메쉬', `비활성화됨 (machineId: ${idLabel}, enabled: false)`, 'mesh.json 또는 패널에서 활성화');
+    } else {
+      ok('세션 메쉬', `활성 (머신: ${idLabel}, 비밀키: ${hasSecret ? '설정됨' : '미설정'}, 통로: ${active.length ? active.join(', ') : '없음'})`);
+    }
+    if (tr.http && tr.http.enabled && (tr.http.bindHost === '0.0.0.0' || tr.http.bindHost === '::')) {
+      warn('세션 메쉬', `HTTP 바인딩이 전체 인터페이스(${tr.http.bindHost})로 열려 있습니다`, '127.0.0.1 또는 Tailscale 사설 IP 로 제한 권장');
+    }
+    if (tr.folder && tr.folder.enabled && (!tr.folder.rootDir || !existsSync(tr.folder.rootDir))) {
+      warn('세션 메쉬', '공유 폴더 통로가 켜져 있으나 대상 폴더를 찾을 수 없습니다', 'mesh.mjs init --folder <경로> 로 재설정');
+    }
+    if (tr.relay && tr.relay.enabled && (!tr.relay.url || !tr.relay.secret)) {
+      warn('세션 메쉬', '중계 통로가 켜져 있으나 URL 또는 비밀키가 비어 있습니다', 'mesh.mjs init --relay <url> --relay-secret <비밀키>');
+    }
+  }
+}
+
 // 출력
 if (JSON_OUT) { process.stdout.write(JSON.stringify({ plugin: PLUGIN_NAME, results }, null, 1) + '\n'); }
 else {
