@@ -1,7 +1,7 @@
 # Antigravity Implant
 
 Google Antigravity 에이전트를 **Claude Code · Codex 처럼** 쓰게 만드는 플러그인입니다.
-말없이 도구만 돌리던 에이전트가 일하면서 말하고, 질문에 먼저 답하고, 중간 증거를 보여주고, 끝낼 때 무엇을 확인했는지 말합니다. 파일 체크포인트·되돌리기, 위험 명령 차단, 고친 파일 문법 검사, 실시간 규칙, 옆 패널(Live Cockpit)도 들어 있습니다.
+말없이 도구만 돌리던 에이전트가 일하면서 말하고, 질문에 먼저 답하고, 중간 증거를 보여주고, 끝낼 때 무엇을 확인했는지 보고합니다. 파일 체크포인트·되돌리기, 위험 명령 차단, 문법 검사, 실시간 규칙, 세션 간 대화(세션 메쉬), 읽기 쉬운 답 자동 번역 설치 옵션, 옆 패널(Live Cockpit)까지 함께 들어 있습니다.
 
 > Windows 에서 만들고 시험했습니다 (Antigravity 앱 2.31, agy CLI 1.5.8). 훅·스킬은 다른 OS 에서도 돌 수 있게 짰지만 시험하지 않았습니다.
 
@@ -21,7 +21,9 @@ Google Antigravity 에이전트를 **Claude Code · Codex 처럼** 쓰게 만드
 | 위험한 명령을 그냥 돌린다 | 드라이브 통째 삭제·포맷 등은 항상 차단, 강제 푸시·`reset --hard`·레지스트리·인터넷 스크립트 바로 실행 등은 사용자가 그 일을 말했을 때만 통과 | 훅 `PreToolUse`(run_command 만) |
 | 문법 오류를 모르고 지나간다 | `.js/.mjs/.cjs/.json/.py` 를 고친 직후 문법 검사 → 오류면 다음 호출에 알림 | 훅 `PostToolUse` |
 | 작업 폴더 밖 파일마다 권한을 묻는다 | 한 번 허락해 읽거나 쓴 파일의 **폴더**를 기억해 다음부터 묻지 않음 (드라이브 맨 위, 사용자 폴더 바로 아래(문서·바탕화면·다운로드 …), 시스템 폴더, 숨김 폴더는 제외. 폴더 목록 보기만으로는 기억하지 않음) | 훅 `PostToolUse` |
-| 무엇을 하는지 안 보인다 | 패널: 진행 / 계획(task.md) / 증거 / 변경(git diff) / 되돌리기 / 실시간 규칙 / 훅 기록, 토큰 사용량, 모드 전환 | 사이드카 |
+| 세션끼리 대화가 단절된다 | 같은 PC의 다른 대화나 원격 기기(Tailscale/LAN·공유 폴더·클라우드 중계)의 Antigravity 세션끼리 메모와 작업 알림을 주고받음 | MCP `session-bridge` + 훅 + CLI + 패널 |
+| 답이 길고 읽기 어렵다 | 설치 옵션 `-ReadableReplies` 로 사용자 언어에 맞춰 자동 번역된 읽기 쉬운 답 10가지 규칙을 `~/.gemini/GEMINI.md` 에 안전 병합 | 설치 도구 `tools/gemini-md.mjs` |
+| 무엇을 하는지 안 보인다 | 패널 9개 탭: 주기율표 모델 / 진행 / 계획(task.md) / 증거 / 변경(git diff) / 되돌리기 / 실시간 규칙 / 훅 기록 / 세션, 토큰 사용량, 모드·테마 전환 | 사이드카 |
 
 ## Claude Code · Codex 에서 쓰던 것 → 여기서는
 
@@ -52,18 +54,22 @@ Google Antigravity 에이전트를 **Claude Code · Codex 처럼** 쓰게 만드
 antigravity-implant/
 ├── plugin.json
 ├── hooks.json             PreInvocation · Stop · PreToolUse(run_command) · PostToolUse 2개
+├── mcp_config.json        세션 메쉬 MCP 서버(session-bridge) 등록
 ├── hooks/
-│   ├── pre_invocation.mjs 모델 호출 직전 알림 (소통·조향·질문·반복·컨텍스트·규칙 변경·실시간 규칙·문법 오류·되돌림)
+│   ├── pre_invocation.mjs 모델 호출 직전 알림 (소통·조향·질문·반복·컨텍스트·규칙 변경·실시간 규칙·문법 오류·되돌림·세션 메쉬 수신)
 │   ├── stop_gate.mjs      마무리 점검·조기 종료 감지
 │   ├── danger_guard.mjs   위험 명령 차단 (node 내장 모듈만, 무슨 일이 있어도 JSON 을 냄)
 │   ├── syntax_check.mjs   고친 파일 문법 검사
 │   ├── folder_grants.mjs  폴더 단위 허락 기억
-│   └── checkpoint_worker.mjs, lib/
+│   └── checkpoint_worker.mjs, lib/ (common.mjs, checkpoint.mjs, mesh.mjs)
+├── mcp/
+│   └── session-bridge.mjs 세션 메쉬 stdio MCP 서버 (도구 5개)
+├── relay/                 클라우드 중계 서버 템플릿 (cloudflare-worker, node-relay)
 ├── rules/AGENTS.md        상시 규칙 8개
 ├── skills/                evidence-checkpoint, status-report, plan-first, code-review, computer-use, rewind,
-│                          remember, init-project, handoff, commit, pr, worktree, doctor
-├── sidecars/live-cockpit  앱 옆 패널
-└── cli/                   rewind.mjs, statusline.mjs, doctor.mjs
+│                          remember, init-project, handoff, commit, pr, worktree, doctor, session-mesh (14개)
+├── sidecars/live-cockpit  앱 옆 패널 (9개 탭: 주기율표 모델 포함)
+└── cli/                   rewind.mjs, statusline.mjs, doctor.mjs, mesh.mjs, mesh-daemon.mjs
 ```
 
 데이터는 `~/.gemini/antigravity-implant/` 에만 씁니다 (대화별 상태, 체크포인트 목록, 오류 로그, 일시정지 신호).
@@ -134,6 +140,14 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1 -ReadableReplies -Lang ko
 - 명령을 `; && || & |` 와 줄바꿈으로 나눠 조각마다 보고, `cmd /c "…"`·`powershell -c "…"`·`-EncodedCommand` 는 속 명령을 꺼내 다시 봅니다. 따옴표 안의 글(커밋 메시지·검색어)은 명령으로 보지 않습니다. 경로의 `..`·`\?\`·`%SystemDrive%`·`$env:USERPROFILE`·겹친 `\`·끝의 점(`C:\Windows.`) 같은 표기도 정리해서 봅니다. `& { … }`·`( … )` 블록, `cmd /c"…"`(붙여 쓰기), `rd /s/q`(옵션 붙여 쓰기), `format /FS:NTFS D:`, 따옴표 안 레지스트리 경로(`Set-ItemProperty -Path "HKCU:\…"`)도 잡습니다. 인터넷 주소는 사용자가 **그대로** 준 주소일 때만 통과합니다(앞부분만 같은 주소는 안 됨).
 - 한계: 명령 문자열만 봅니다. 스크립트 파일 속에 숨긴 명령이나 파일 편집 도구로 하는 일은 막지 못합니다.
 - 끄기: `config.json` 에 `"dangerGuard": false`
+
+## 세션 메쉬 (세션·기기 간 대화)
+
+같은 PC의 다른 Antigravity 대화나 원격 기기(Windows·Mac)의 세션끼리 메모와 작업 알림을 주고받습니다. 내장 MCP 서버(`session-bridge`, 도구 5개)와 `cli/mesh.mjs`, Live Cockpit 「세션」 탭, `/session-mesh` 스킬을 함께 제공합니다.
+
+- 로컬 세션은 별도 설정 없이 바로 연결되며(`toMachine: "local"`), 원격 연결은 `http(Tailscale/LAN) → relay(클라우드 중계) → folder(공유 폴더)` 순서로 자동 폴백합니다.
+- `node cli/mesh.mjs init --name <이름> --tailscale`(또는 `--folder` / `--relay`)로 초기화한 뒤 `pair-export` 토큰을 반대편 기기에서 `pair-import` 해 연결합니다. 클라우드 중계 배포 안내는 `relay/README.md` 참고.
+- 수신된 피어 메시지는 신뢰 불가 참고 메모 헤더로 주입되어 시스템 규칙이나 사용자 지시를 덮어쓰지 않으며, 전달 횟수(기본 4)를 제한합니다.
 
 ## computer use (선택)
 
