@@ -75,18 +75,23 @@ antigravity-implant/
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\install.ps1 -StatusLine
+# 선택: ~/.gemini/GEMINI.md 에 사용자 언어에 맞춘 "읽기 쉬운 답" 규칙 추가
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -StatusLine -ReadableReplies
+# 선택: 언어 직접 지정 (ko, en, ja, zh-CN, zh-TW, es, fr, de, pt 등)
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -ReadableReplies -Lang ko
 ```
 
 그다음 앱을 다시 시작하고, 대화 화면 오른쪽 패널의 **`+` → Extensions → Live Cockpit** 으로 엽니다(대화마다 한 번). 처음 한 번은 왼쪽 **Customizations → antigravity-implant → UI extensions → Live Cockpit** 에서 Running 인지 확인하세요. 새 대화에서 "이 폴더 파일 3개를 읽고 요약해줘" 라고 보내 보세요. 도구마다 진행률 한 줄이 먼저 나오면 동작하는 것입니다. 점검은 `/doctor`.
 
 - 잠깐 끄기(재시작 없이): `~/.gemini/antigravity-implant/off` 빈 파일을 만들기. 지우면 다시 켜짐
 - 끄기/켜기: `agy plugin disable antigravity-implant` / `agy plugin enable antigravity-implant`
-- 지우기: `install.ps1 -Uninstall` (데이터 폴더는 남김)
+- 지우기: `install.ps1 -Uninstall` (데이터 폴더는 남기며, `-ReadableReplies` 로 추가한 `GEMINI.md` 마커 구역은 함께 제거)
 
 ## 설정 (`~/.gemini/antigravity-implant/config.json`, 없으면 기본값)
 
 ```json
 {
+  "language": "auto",
   "remindMode": { "gemini": "always", "claude": "smart", "default": "smart" },
   "silentWarnAfter": 2,
   "stopGate": true,
@@ -99,6 +104,8 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1 -StatusLine
   "checkpoints": true
 }
 ```
+
+- `language` (기본 `"auto"`): `install.ps1 -ReadableReplies` 실행 시 사용할 언어. `"auto"` 이면 앱 `config.json` → 기존 `GEMINI.md` 내용 → `ANTIGRAVITY_LANG` / OS 표시 언어 / `LANG` 순으로 감지해 번역합니다. 직접 `"ko"`, `"en"`, `"ja"` 같은 태그를 넣으면 그 언어로 맞춥니다.
 
 - `folderGrantsFromCommands` (기본 꺼짐): 켜면 샌드박스 밖 실행(`BypassSandbox`)을 사용자가 허락해 성공한 `run_command` 에서, 명령에 나온 실제 경로(최대 3개)의 폴더에 `write_file(<폴더>\)` 를 넣습니다. 작업 위치(`Cwd`)만으로는 넣지 않습니다. 터미널 샌드박스의 쓰기 범위가 이 규칙을 따르므로(agy CLI 로 확인), 다음부터 그 폴더 작업은 샌드박스 안에서 묻지 않고 됩니다. 경로는 `realpath` 로 진짜 위치를 구한 뒤 판단하고, 폴더 허락과 같은 제외 규칙(드라이브 맨 위·홈·홈 바로 아래·AppData·점 폴더·시스템 폴더·이상한 표기)에 더해 실행 파일·스크립트(`.exe` `.ps1` `.py` 등)가 있는 폴더와 와일드카드 경로는 넓히지 않습니다.
 - 폴더 허락은 허락한 경로가 실제 위치(`realpath`)와 같을 때만 넓힙니다. 경로 중간에 정션·심볼릭 링크·짧은 이름이 있어 실제 위치가 다르면, 사용자가 본 적 없는 곳에 규칙을 쓰지 않도록 넓히지 않습니다(그 파일은 계속 묻습니다). 끝의 점·공백, `~1` 짧은 이름, `:` 데이터 스트림, `\\?\` 접두사가 든 경로는 다른 폴더를 가리킬 수 있어 넓히지 않습니다. 샌드박스 밖 실행 자체를 자동 허락하는 규칙은 없습니다(`unsandboxed(…)` 규칙도 agy CLI 에서 듣지 않음).

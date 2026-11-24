@@ -47,11 +47,20 @@ cd antigravity-implant
 powershell -ExecutionPolicy Bypass -File .\install.ps1 -StatusLine
 ```
 
+선택 옵션:
+
+```powershell
+# 읽기 쉬운 답 10가지 규칙을 ~/.gemini/GEMINI.md 에 사용자 설정·언어에 맞게 자동 번역해 추가
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -StatusLine -ReadableReplies
+# 언어를 직접 지정할 때 (지원 내장 언어: ko, en, ja, zh-CN, zh-TW, es, fr, de, pt, 그 외 로캘은 영어 규칙 + 해당 언어 응답 지시)
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -ReadableReplies -Lang ko
+```
+
 - 앱을 다시 시작하고, 대화 화면 오른쪽 패널의 **`+` → Extensions → Live Cockpit** 으로 엽니다(대화마다 한 번). 처음 한 번은 왼쪽 **Customizations → antigravity-implant → UI extensions → Live Cockpit** 에서 Running 인지 확인하세요.
 - 점검: 새 대화에서 `/doctor`
-- 제거: `install.ps1 -Uninstall` (데이터 폴더는 남김)
+- 제거: `install.ps1 -Uninstall` (데이터 폴더는 남기며, `-ReadableReplies` 로 넣은 `GEMINI.md` 구역은 마커 기준으로 자동 정리)
 
-`install.ps1` 은 플러그인을 임시 폴더에서 검증한 뒤 `%USERPROFILE%\.gemini\config\plugins\` 에 넣기만 합니다. 관리자 권한, 레지스트리, 권한 허용 목록, 외부 다운로드는 건드리지 않습니다. `-StatusLine` 은 agy CLI 설정을 백업한 뒤 상태줄 한 항목만 추가합니다.
+`install.ps1` 은 플러그인을 임시 폴더에서 검증한 뒤 `%USERPROFILE%\.gemini\config\plugins\` 에 넣기만 합니다. 관리자 권한, 레지스트리, 권한 허용 목록, 외부 다운로드는 건드리지 않습니다. `-StatusLine` 은 agy CLI 설정을 백업한 뒤 상태줄 한 항목만 추가합니다. `-ReadableReplies` 는 `~/.gemini/GEMINI.md` 를 변경 전 `.bak` 으로 백업하고 마커 구역(`<!-- antigravity-implant:readable-replies:start ... -->`)만 관리하며, 언어는 `-Lang` → `~/.gemini/antigravity-implant/config.json` → 앱 `config.json` → 기존 `GEMINI.md` 본문 → `ANTIGRAVITY_LANG` / Windows 표시 언어 / `LANG` 순으로 자동 결정합니다. 이미 수동으로 같은 제목의 규칙을 적어 두었다면 건너뜁니다.
 
 ### 선택: 데스크톱 앱 조작 (computer use)
 
@@ -90,7 +99,7 @@ powershell -ExecutionPolicy Bypass -File .\install-computer-use.ps1
 node tests/run-all.mjs
 ```
 
-시험 199개. 임시 폴더를 가짜 사용자 폴더로 써서 실제 설정(`~/.gemini`)을 건드리지 않습니다. `cockpit-rewind-test` 는 앱이 깔아 둔 `sidecar_sdk` 가 있어야 하고, 없으면 건너뜁니다.
+시험 273개. 임시 폴더를 가짜 사용자 폴더로 써서 실제 설정(`~/.gemini`)을 건드리지 않습니다. `cockpit-rewind-test` 는 앱이 깔아 둔 `sidecar_sdk` 가 있어야 하고, 없으면 건너뜁니다.
 
 ## 왜 이렇게 만들었나 (실험으로 확인한 것)
 

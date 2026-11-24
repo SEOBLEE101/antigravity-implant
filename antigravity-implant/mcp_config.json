@@ -2,7 +2,6 @@
   "mcpServers": {
     "session-bridge": {
       "command": "node",
-      "type": "stdio",
       "args": [
         "mcp/session-bridge.mjs"
       ]
